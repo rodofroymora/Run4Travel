@@ -1,9 +1,15 @@
 # SPEC-009 — Social Sharing & exports
 
-**Status:** implemented (client v1 mock)  
+**Status:** hardened (client v1.1 mock)  
 **Golden Path:** Share to Instagram / Social  
 **Depends on:** SPEC-008 (o summary share mínimo)  
 **Blocks:** —
+
+### Hardening notes (v1.1)
+
+- Pipeline stub compose→render→watermark con barra de progreso.
+- Preview por formato + caption ES; share/save siguen stub (sin APIs nativas).
+- TODO: render real (Skia/vista) cuando haya media.
 
 ---
 

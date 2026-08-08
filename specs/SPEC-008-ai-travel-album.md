@@ -1,9 +1,15 @@
 # SPEC-008 — ✦ AI Travel Album + Editor
 
-**Status:** implemented (client v1 mock)  
+**Status:** hardened (client v1.1 mock)  
 **Golden Path:** ✦ AI generates Travel Album → Preview → Customize  
 **Depends on:** SPEC-007, SPEC-006 (fotos), SPEC-004  
 **Blocks:** SPEC-009
+
+### Hardening notes (v1.1)
+
+- Nombres de lugar desde catálogo; prioriza stories escuchadas.
+- Editor: reordenar, ocultar, restaurar ocultas, editar caption, flash de guardado.
+- Copy de cierre en español; ✦ editorial mock (sin red).
 
 ---
 

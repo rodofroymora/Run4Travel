@@ -1,9 +1,20 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BatlloBackground } from '../components/BatlloBackground';
 import { SHARE_ASPECT } from '../domain/shareFormats';
-import { buildShareAsset, shareOrSaveStub } from '../services/shareExport';
+import {
+  buildShareAsset,
+  exportShareAsset,
+  shareOrSaveStub,
+} from '../services/shareExport';
 import type { ShareFormat } from '../types/share';
 import { colors, fonts, radii, spacing } from '../theme';
 
@@ -25,17 +36,62 @@ const FORMATS: ShareFormat[] = [
 export function ShareScreen({ runId, routeName, cityName, onBack, onDone }: Props) {
   const insets = useSafeAreaInsets();
   const [format, setFormat] = useState<ShareFormat>('story_9x16');
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState<string | null>(null);
+
   const asset = useMemo(
     () => buildShareAsset(format, { runId, routeName, cityName }),
     [format, runId, routeName, cityName],
   );
   const spec = SHARE_ASPECT[format];
-  const previewH = 220;
+  const previewH = format === 'story_9x16' ? 260 : 220;
   const previewW = previewH * (spec.width / spec.height);
+
+  const runExport = async (mode: 'share' | 'save') => {
+    setBusy(true);
+    setProgress(0);
+    setStatus('Preparando…');
+    try {
+      const exported = await exportShareAsset(
+        format,
+        { runId, routeName, cityName },
+        (p) => {
+          if (p.phase === 'error') {
+            setStatus(p.message);
+            return;
+          }
+          setProgress(p.progress);
+          setStatus(p.message);
+        },
+      );
+      const r = await shareOrSaveStub(exported, mode);
+      if (r !== 'ok') {
+        Alert.alert('Error', mode === 'share' ? 'No se pudo compartir' : 'No se pudo guardar');
+        return;
+      }
+      Alert.alert(
+        mode === 'share' ? 'Listo' : 'Guardado',
+        mode === 'share'
+          ? 'Share sheet stub: archivo listo para Instagram / sistema.'
+          : 'Stub: guardado en carrete.',
+      );
+      if (mode === 'share') onDone();
+    } finally {
+      setBusy(false);
+      setStatus(null);
+      setProgress(0);
+    }
+  };
 
   return (
     <BatlloBackground>
-      <View style={[styles.wrap, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.wrap,
+          { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 },
+        ]}
+      >
         <Pressable onPress={onBack}>
           <Text style={styles.back}>← Atrás</Text>
         </Pressable>
@@ -47,7 +103,7 @@ export function ShareScreen({ runId, routeName, cityName, onBack, onDone }: Prop
             <Pressable
               key={f}
               style={[styles.chip, format === f && styles.chipOn]}
-              onPress={() => setFormat(f)}
+              onPress={() => !busy && setFormat(f)}
             >
               <Text style={[styles.chipLabel, format === f && styles.chipLabelOn]}>
                 {SHARE_ASPECT[f].label}
@@ -61,7 +117,7 @@ export function ShareScreen({ runId, routeName, cityName, onBack, onDone }: Prop
             style={[
               styles.preview,
               {
-                width: Math.min(previewW, 280),
+                width: Math.min(previewW, 300),
                 height: previewH,
                 backgroundColor: asset.transparent ? 'transparent' : colors.ink,
                 borderWidth: asset.transparent ? 1 : 0,
@@ -70,56 +126,62 @@ export function ShareScreen({ runId, routeName, cityName, onBack, onDone }: Prop
               },
             ]}
           >
+            <Text style={styles.previewEyebrow}>✦ Discovery Run</Text>
             <Text style={styles.previewTitle}>{routeName}</Text>
             <Text style={styles.previewCity}>{cityName}</Text>
             <View style={styles.fakeRoute} />
+            <View style={styles.fakeRouteSoft} />
             <Text style={styles.wm}>Run4Travel</Text>
-            {asset.transparent ? (
-              <Text style={styles.alpha}>overlay α</Text>
-            ) : null}
+            {asset.transparent ? <Text style={styles.alpha}>overlay α</Text> : null}
           </View>
           <Text style={styles.dims}>
             {asset.width}×{asset.height}
-            {asset.transparent ? ' · PNG transparente' : ''}
+            {asset.transparent ? ' · PNG transparente' : ' · PNG'}
           </Text>
         </View>
 
         {asset.caption ? (
-          <Text style={styles.caption}>{asset.caption}</Text>
+          <View style={styles.captionBox}>
+            <Text style={styles.captionLabel}>Caption sugerido</Text>
+            <Text style={styles.caption}>{asset.caption}</Text>
+          </View>
+        ) : null}
+
+        {busy ? (
+          <View style={styles.progressCard}>
+            <Text style={styles.progressText}>{status ?? 'Exportando…'}</Text>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+            </View>
+          </View>
         ) : null}
 
         <Pressable
-          style={styles.cta}
-          onPress={async () => {
-            const r = await shareOrSaveStub(asset, 'share');
-            Alert.alert(
-              r === 'ok' ? 'Listo' : 'Error',
-              r === 'ok'
-                ? 'Share sheet stub: archivo listo para Instagram / sistema.'
-                : 'No se pudo compartir',
-            );
-            if (r === 'ok') onDone();
-          }}
+          style={[styles.cta, busy && styles.ctaDisabled]}
+          disabled={busy}
+          onPress={() => void runExport('share')}
         >
-          <Text style={styles.ctaLabel}>Abrir share sheet</Text>
+          <Text style={styles.ctaLabel}>
+            {busy ? 'Exportando…' : 'Abrir share sheet'}
+          </Text>
         </Pressable>
         <Pressable
-          style={styles.secondary}
-          onPress={async () => {
-            await shareOrSaveStub(asset, 'save');
-            Alert.alert('Guardado', 'Stub: guardado en carrete.');
-          }}
+          style={[styles.secondary, busy && styles.ctaDisabled]}
+          disabled={busy}
+          onPress={() => void runExport('save')}
         >
           <Text style={styles.secondaryLabel}>Guardar en carrete</Text>
         </Pressable>
-      </View>
+        <Text style={styles.todo}>
+          TODO: export real (Skia/vista) cuando haya media; hoy es stub de alta fidelidad.
+        </Text>
+      </ScrollView>
     </BatlloBackground>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    flex: 1,
     paddingHorizontal: spacing.lg,
   },
   back: {
@@ -170,6 +232,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
+  previewEyebrow: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 11,
+    color: colors.mosaicYellow,
+    marginBottom: 4,
+  },
   previewTitle: {
     fontFamily: fonts.headingBold,
     fontSize: 18,
@@ -185,8 +253,16 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: colors.terracotta,
     borderRadius: 4,
-    marginBottom: 10,
+    marginBottom: 6,
     width: '80%',
+  },
+  fakeRouteSoft: {
+    height: 3,
+    backgroundColor: colors.seaGreen,
+    borderRadius: 4,
+    marginBottom: 10,
+    width: '55%',
+    opacity: 0.7,
   },
   wm: {
     fontFamily: fonts.body,
@@ -207,12 +283,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.secondaryText,
   },
+  captionBox: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borders,
+    padding: 14,
+    marginBottom: 16,
+    ...radii.cardStat,
+  },
+  captionLabel: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 11,
+    color: colors.secondaryText,
+    marginBottom: 6,
+    letterSpacing: 0.6,
+  },
   caption: {
     fontFamily: fonts.body,
     fontSize: 13,
     color: colors.ink,
-    marginBottom: 16,
     lineHeight: 20,
+  },
+  progressCard: {
+    backgroundColor: colors.ink,
+    padding: 14,
+    marginBottom: 14,
+    ...radii.cardStat,
+  },
+  progressText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    color: colors.surface,
+    marginBottom: 10,
+  },
+  progressTrack: {
+    height: 6,
+    backgroundColor: '#3a2a1c',
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.terracotta,
   },
   cta: {
     backgroundColor: colors.terracotta,
@@ -221,6 +333,7 @@ const styles = StyleSheet.create({
     ...radii.primaryButton,
     marginBottom: 10,
   },
+  ctaDisabled: { opacity: 0.6 },
   ctaLabel: {
     fontFamily: fonts.bodySemi,
     fontSize: 16,
@@ -238,5 +351,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemi,
     fontSize: 15,
     color: colors.ink,
+  },
+  todo: {
+    marginTop: 14,
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.secondaryText,
+    textAlign: 'center',
   },
 });

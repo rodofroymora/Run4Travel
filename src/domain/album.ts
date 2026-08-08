@@ -1,3 +1,4 @@
+import { getPlacesForCity } from '../data/places';
 import type { AlbumCard, TravelAlbum } from '../types/album';
 import type { DiscoveryRoute } from '../types/discovery';
 import type { RunSession } from '../types/run';
@@ -5,6 +6,15 @@ import { formatDistanceKm } from './geo';
 
 function id(prefix: string, i: number): string {
   return `${prefix}_${i}`;
+}
+
+function placeNameFor(
+  route: DiscoveryRoute,
+  placeId: string,
+  fallback: string,
+): string {
+  const places = getPlacesForCity(route.intent.cityId, route.intent.start);
+  return places.find((p) => p.id === placeId)?.name ?? fallback;
 }
 
 /** Plantilla determinística local (fallback sin red / sin IA). */
@@ -32,20 +42,24 @@ export function buildAlbumTemplate(
     },
   ];
 
-  const places = route.storyPoints.slice(0, 6);
-  places.forEach((sp, i) => {
-    const placeName =
-      route.photoSpots.find((p) => p.placeId === sp.placeId)?.placeId ?? sp.placeId;
-    const catalogName =
-      // resolve from story short text or place id
-      sp.shortDescription.replace(/^✦\s*/, '').split(':')[0] || placeName;
-    const photo = session.photos.find((p) => p.storyPointId === sp.id || p.photoSpotId === sp.photoSpotId);
+  // Prefer stories that were heard; else top route stories
+  const heardIds = new Set(session.storyEvents.map((e) => e.storyPointId));
+  const orderedStories = [
+    ...route.storyPoints.filter((sp) => heardIds.has(sp.id)),
+    ...route.storyPoints.filter((sp) => !heardIds.has(sp.id)),
+  ].slice(0, 6);
+
+  orderedStories.forEach((sp, i) => {
+    const name = placeNameFor(route, sp.placeId, sp.placeId);
+    const photo = session.photos.find(
+      (p) => p.storyPointId === sp.id || p.photoSpotId === sp.photoSpotId,
+    );
     cards.push({
       id: id('ps', 3 + i),
       type: 'photo_story',
       photoId: photo?.id,
-      placeName: catalogName.trim(),
-      storyExcerpt: sp.storyVersions.quick,
+      placeName: name,
+      storyExcerpt: sp.storyVersions.standard || sp.storyVersions.quick,
     });
   });
 
@@ -61,7 +75,7 @@ export function buildAlbumTemplate(
   cards.push({
     id: id('final', 21),
     type: 'final',
-    caption: 'Run the city. Hear its story. Capture the journey.',
+    caption: 'Corre la ciudad. Escucha su historia. Captura el viaje.',
   });
 
   return {
@@ -74,18 +88,30 @@ export function buildAlbumTemplate(
   };
 }
 
-/** Mock “AI”: reordena/copy editorial sobre la plantilla; no inventa lugares. */
+/** Mock ✦: copy editorial sobre la plantilla; no inventa lugares. */
 export function generateAlbumWithAi(
   session: RunSession,
   route: DiscoveryRoute,
 ): TravelAlbum {
   const base = buildAlbumTemplate(session, route);
-  const cover = base.cards.find((c) => c.type === 'cover');
-  if (cover && cover.type === 'cover') {
-    cover.subtitle = `✦ ${session.cityName} a tu ritmo`;
-  }
+  const cards = base.cards.map((c) => {
+    if (c.type === 'cover') {
+      return {
+        ...c,
+        subtitle: `✦ ${session.cityName} a tu ritmo`,
+      };
+    }
+    if (c.type === 'final') {
+      return {
+        ...c,
+        caption: `✦ ${session.cityName}: descubriste ${session.storyEvents.length || route.storyPoints.length} historias en ${formatDistanceKm(session.distanceM)}.`,
+      };
+    }
+    return c;
+  });
   return {
     ...base,
+    cards,
     createdBy: 'ai',
     updatedAt: new Date().toISOString(),
   };
@@ -108,6 +134,24 @@ export function hideAlbumCard(album: TravelAlbum, cardId: string): TravelAlbum {
   };
 }
 
+export function unhideAlbumCard(album: TravelAlbum, cardId: string): TravelAlbum {
+  return {
+    ...album,
+    cards: album.cards.map((c) => (c.id === cardId ? { ...c, hidden: false } : c)),
+    createdBy: 'user',
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function restoreHiddenCards(album: TravelAlbum): TravelAlbum {
+  return {
+    ...album,
+    cards: album.cards.map((c) => ({ ...c, hidden: false })),
+    createdBy: 'user',
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export function editPhotoStoryCaption(
   album: TravelAlbum,
   cardId: string,
@@ -125,4 +169,8 @@ export function editPhotoStoryCaption(
 
 export function visibleCards(album: TravelAlbum): AlbumCard[] {
   return album.cards.filter((c) => !c.hidden);
+}
+
+export function hiddenCount(album: TravelAlbum): number {
+  return album.cards.filter((c) => c.hidden).length;
 }

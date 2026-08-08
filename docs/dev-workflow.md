@@ -25,7 +25,7 @@ Golden Path cliente mock v1 base: `cursor/golden-path-client-v1` / commit en `ma
 | `cursor/gp-route-preview` | Preview UI + offline pack gate (mock map) | 003 ✅ |
 | `cursor/gp-route` | Router pluggable + distancia/caché/UX | 002 ✅ (Mapbox real pendiente de token) |
 | `cursor/gp-run` | Live metrics/charts + GPS sim + offline run | 004–007 (en curso / hardened) |
-| `cursor/gp-album-share` | Render/export álbum y share | 008 + 009 |
+| `cursor/gp-album-share` | Editor álbum + export stub UX | 008 + 009 ✅ |
 | `cursor/gp-strava` | OAuth mock + outbox Strava | 010 |
 
 Cada slice abre PR contra trunk cuando el demo del hardening esté listo; las specs se actualizan solo si cambia el contrato.
