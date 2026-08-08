@@ -1,9 +1,15 @@
 # SPEC-007 — Resumen post-carrera
 
-**Status:** implemented (client v1 mock)  
+**Status:** hardened (client v1.1 mock)  
 **Golden Path:** Running Summary  
 **Depends on:** SPEC-004  
 **Blocks:** SPEC-008 (trigger álbum)
+
+### Hardening notes (v1.1)
+
+- Chart de ritmo construido desde `RunSession.splitsKm` (no barras placeholder).
+- `splitsToChartBars` + bandas Green→Yellow→Terracotta compartidas con carrera activa.
+- Tests de agregación `runSummary` / `runMetrics`.
 
 ---
 

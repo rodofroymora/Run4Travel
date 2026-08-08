@@ -1,9 +1,14 @@
 # SPEC-006 — Photo Spots
 
-**Status:** implemented (client v1 mock)  
+**Status:** hardened (client v1.1 mock)  
 **Golden Path:** 📸 Photo Spot  
 **Depends on:** SPEC-002 (spots), SPEC-004 (location)  
 **Blocks:** SPEC-008 (album inputs)
+
+### Hardening notes (v1.1)
+
+- Safety gate intacto en carrera activa; captura stub → `RunSession.photos` → álbum.
+- Cámara real pendiente (sin permisos extra en demo).
 
 ---
 

@@ -11,6 +11,7 @@ import { BatlloBackground } from '../components/BatlloBackground';
 import { MedalBadge } from '../components/MedalBadge';
 import { PaceChart } from '../components/PaceChart';
 import { formatDistanceKm, formatDuration, formatPace } from '../domain/geo';
+import { splitsToChartBars } from '../domain/runMetrics';
 import { buildRunSummary, medalLabel } from '../domain/runSummary';
 import { track } from '../services/analytics';
 import { generateAlbumForRun, getAlbumByRunId } from '../services/albumStore';
@@ -79,13 +80,7 @@ export function SummaryScreen({
   }, [summary.discoveryRunCompleted, summary]);
 
   const splitBars = summary.splits.length
-    ? summary.splits.slice(0, 10).map((s) => {
-        const pace = s.paceSec;
-        const color =
-          pace < 320 ? colors.seaGreen : pace < 360 ? colors.mosaicYellow : colors.terracotta;
-        const h = Math.min(64, Math.max(20, 80 - (pace - 280) / 3));
-        return { h, color };
-      })
+    ? splitsToChartBars(summary.splits, { maxBars: 12 })
     : undefined;
 
   return (
@@ -134,12 +129,16 @@ export function SummaryScreen({
 
         <View style={styles.block}>
           <PaceChart
+            title="Ritmo por tramo"
             subtitle={
-              summary.narrationAdaptations
-                ? `narración adaptada ${summary.narrationAdaptations} veces`
-                : `${summary.photoCount} fotos · discovery`
+              summary.splits.length
+                ? summary.narrationAdaptations
+                  ? `${summary.splits.length} km · narración adaptada ${summary.narrationAdaptations} veces`
+                  : `${summary.splits.length} km desde tu carrera · ${summary.photoCount} fotos`
+                : 'Sin tramos completos — corre un poco más en la próxima'
             }
-            bars={splitBars}
+            bars={splitBars ?? []}
+            emptyLabel="Sin splits en esta sesión"
           />
         </View>
 

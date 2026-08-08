@@ -1,50 +1,77 @@
 import { StyleSheet, Text, View } from 'react-native';
+import type { ChartBar, PaceBand } from '../domain/runMetrics';
 import { colors, fonts, radii } from '../theme';
 
-const DEFAULT_BARS = [
-  { h: 28, color: colors.seaGreen },
-  { h: 44, color: colors.seaGreen },
-  { h: 36, color: colors.mosaicYellow },
-  { h: 58, color: colors.mosaicYellow },
-  { h: 48, color: colors.terracotta },
-  { h: 64, color: colors.terracotta },
-  { h: 40, color: colors.seaGreen },
-  { h: 52, color: colors.mosaicYellow },
-  { h: 34, color: colors.seaGreen },
-  { h: 46, color: colors.terracotta },
+const BAND_COLOR: Record<PaceBand, string> = {
+  fast: colors.seaGreen,
+  steady: colors.mosaicYellow,
+  easy: colors.terracotta,
+};
+
+const DEFAULT_BARS: ChartBar[] = [
+  { h: 28, band: 'fast' },
+  { h: 44, band: 'fast' },
+  { h: 36, band: 'steady' },
+  { h: 58, band: 'steady' },
+  { h: 48, band: 'easy' },
+  { h: 64, band: 'easy' },
+  { h: 40, band: 'fast' },
+  { h: 52, band: 'steady' },
+  { h: 34, band: 'fast' },
+  { h: 46, band: 'easy' },
 ];
 
 type Props = {
   title?: string;
   subtitle?: string;
-  bars?: { h: number; color: string }[];
+  /** Pass `[]` for empty; omit for decorative defaults (home mock only). */
+  bars?: ChartBar[] | null;
+  /** When true, empty bars show waiting copy (live run). */
+  live?: boolean;
+  emptyLabel?: string;
 };
 
 export function PaceChart({
   title = 'Ritmo por tramo',
   subtitle = 'narración adaptada 3 veces',
-  bars = DEFAULT_BARS,
+  bars,
+  live = false,
+  emptyLabel = 'Los tramos aparecen al completar cada km',
 }: Props) {
+  const data = bars != null ? bars : live ? [] : DEFAULT_BARS;
+  const showEmpty = data.length === 0;
+
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>{title}</Text>
-      <View style={styles.chart}>
-        {bars.map((bar, i) => (
-          <View key={i} style={styles.barTrack}>
-            <View
-              style={[
-                styles.bar,
-                {
-                  height: bar.h,
-                  backgroundColor: bar.color,
-                  borderTopLeftRadius: 6 + (i % 3),
-                  borderTopRightRadius: 8 + (i % 2),
-                },
-              ]}
-            />
-          </View>
-        ))}
+      <View style={styles.header}>
+        <Text style={styles.title}>{title}</Text>
+        {live ? <Text style={styles.livePill}>EN VIVO</Text> : null}
       </View>
+      {showEmpty ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyText}>{emptyLabel}</Text>
+        </View>
+      ) : (
+        <View style={styles.chart}>
+          {data.map((bar, i) => (
+            <View key={i} style={styles.barTrack}>
+              <View
+                style={[
+                  styles.bar,
+                  {
+                    height: bar.h,
+                    backgroundColor: BAND_COLOR[bar.band],
+                    opacity: bar.partial ? 0.55 : 1,
+                    borderTopLeftRadius: 6 + (i % 3),
+                    borderTopRightRadius: 8 + (i % 2),
+                  },
+                ]}
+              />
+              {bar.label ? <Text style={styles.kmLabel}>{bar.label}</Text> : null}
+            </View>
+          ))}
+        </View>
+      )}
       <Text style={styles.subtitle}>{subtitle}</Text>
     </View>
   );
@@ -58,26 +85,53 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     ...radii.cardSoft,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
   title: {
     fontFamily: fonts.bodySemi,
     fontSize: 14,
     color: colors.surface,
-    marginBottom: 14,
+  },
+  livePill: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: colors.terracotta,
+  },
+  empty: {
+    height: 72,
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: 'rgba(255,248,239,0.55)',
   },
   chart: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    height: 72,
+    height: 84,
     gap: 6,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   barTrack: {
     flex: 1,
     justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   bar: {
     width: '100%',
     minHeight: 12,
+  },
+  kmLabel: {
+    marginTop: 4,
+    fontFamily: fonts.mono,
+    fontSize: 9,
+    color: 'rgba(255,248,239,0.45)',
   },
   subtitle: {
     fontFamily: fonts.body,

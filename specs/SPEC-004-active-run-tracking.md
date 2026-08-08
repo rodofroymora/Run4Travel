@@ -1,9 +1,15 @@
 # SPEC-004 — Carrera activa: tracking, navegación y métricas
 
-**Status:** implemented (client v1 mock)  
+**Status:** hardened (client v1.1 mock)  
 **Golden Path:** START RUN → Navigation → Continue Running → FINISH  
 **Depends on:** SPEC-003 (offline ready)  
 **Blocks:** SPEC-005, SPEC-006, SPEC-007
+
+### Hardening notes (v1.1)
+
+- GPS mock acelerado con timestamps realistas + variación de ritmo (splits vivos).
+- Métricas live + badge offline; CTA **Finalizar**.
+- Persistencia AsyncStorage de `RunSession` en cada sample (offline-first).
 
 ---
 

@@ -41,8 +41,8 @@ Flujo cliente sin backend real:
 1. **Hoy** → *✦ Crear ruta con IA* → wizard SPEC-001 (ciudad → partida → distancia → estilo)
 2. **✦ Creando tu ruta…** (SPEC-002) — ranking mock de places del catálogo + polyline del router determinístico → caché
 3. **Preview** (SPEC-003) — mapa mock, story/photo cards → *Empezar a correr* descarga pack offline
-4. **Carrera activa** (SPEC-004/005/006) — GPS simulado, ritmo/distancia, banners `✦ Te acercas a…`, photo spots con safety gate → *Finish*
-5. **Resumen** (SPEC-007) — stats reales de la sesión + card de álbum
+4. **Carrera activa** (SPEC-004/005/006) — GPS simulado acelerado, métricas + **chart de ritmo en vivo**, banners `✦ Te acercas a…`, photo spots con safety gate → *Finalizar*
+5. **Resumen** (SPEC-007) — stats y chart desde `RunSession.splitsKm` + card de álbum
 6. **Álbum** (SPEC-008) — cards editoriales, reordenar / ocultar / editar texto
 7. **Compartir** (SPEC-009) — formatos 9:16 / 4:5 / 1:1 / overlay transparente (stub share/save)
 8. **Strava** (SPEC-010, opcional desde resumen) — conectar stub, cola outbox idempotente, flush offline

@@ -1,9 +1,14 @@
 # SPEC-005 — Pace-aware AI Storytelling + Music ducking
 
-**Status:** implemented (client v1 mock)  
+**Status:** hardened (client v1.1 mock)  
 **Golden Path:** Music → AI Story → Music resumes  
 **Depends on:** SPEC-002 (stories), SPEC-004 (pace/ETA)  
 **Blocks:** — (enriquece run)
+
+### Hardening notes (v1.1)
+
+- Triggers siguen usando ritmo live / ETA; contador de adaptaciones alimenta chart del resumen.
+- TTS real sigue stub (`cache://audio/...`); ducking mock local.
 
 ---
 

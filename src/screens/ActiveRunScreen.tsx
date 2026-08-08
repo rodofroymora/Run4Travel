@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BatlloBackground } from '../components/BatlloBackground';
 import { MockMap } from '../components/MockMap';
+import { PaceChart } from '../components/PaceChart';
 import { getPlacesForCity } from '../data/places';
 import { formatDistanceKm, formatDuration, formatPace, haversineM } from '../domain/geo';
 import { evaluatePhotoSafety } from '../domain/photoSafety';
 import {
   computeAvgPaceSecPerKm,
+  computePartialSplit,
   computeSplitsKm,
   currentPaceSecPerKm,
   distanceFromSamples,
+  splitsToChartBars,
 } from '../domain/runMetrics';
 import {
   selectStoryVersion,
@@ -112,7 +115,9 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
     track('run_started', { routeId: route.id });
     const streamer = createMockGpsStreamer(route.geometry.coordinates, {
       paceSecPerKm: 330,
-      tickMs: 900,
+      tickMs: 500,
+      metersPerTick: 22,
+      paceVarianceSec: 50,
     });
     streamerRef.current = streamer;
     streamer.start(onSample);
@@ -122,6 +127,16 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
 
   const userPos = samples[samples.length - 1];
   const pace = currentPaceSecPerKm(samples) || sessionRef.current.avgPaceSecPerKm || 330;
+  const liveBars = useMemo(
+    () =>
+      splitsToChartBars(sessionRef.current.splitsKm, {
+        partial: computePartialSplit(samples),
+        maxBars: 10,
+      }),
+    // tick forces recompute while sessionRef mutates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tick, samples],
+  );
 
   // Story + photo triggers
   useEffect(() => {
@@ -278,89 +293,106 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
   return (
     <BatlloBackground>
       <View style={[styles.wrap, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 }]}>
-        <View style={styles.topRow}>
-          <Text style={styles.live}>{paused ? 'PAUSA' : 'EN CURSO'}</Text>
-          <Pressable
-            onPress={() =>
-              Alert.alert('¿Descartar carrera?', 'Se perderá el progreso demo.', [
-                { text: 'Seguir', style: 'cancel' },
-                {
-                  text: 'Descartar',
-                  style: 'destructive',
-                  onPress: () => {
-                    streamerRef.current?.stop();
-                    track('run_discarded', { runId: s.id });
-                    onDiscard();
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.topRow}>
+            <Text style={styles.live}>{paused ? 'PAUSA' : 'EN CURSO · OFFLINE'}</Text>
+            <Pressable
+              onPress={() =>
+                Alert.alert('¿Descartar carrera?', 'Se perderá el progreso demo.', [
+                  { text: 'Seguir', style: 'cancel' },
+                  {
+                    text: 'Descartar',
+                    style: 'destructive',
+                    onPress: () => {
+                      streamerRef.current?.stop();
+                      track('run_discarded', { runId: s.id });
+                      onDiscard();
+                    },
                   },
-                },
-              ])
+                ])
+              }
+            >
+              <Text style={styles.discard}>Salir</Text>
+            </Pressable>
+          </View>
+
+          <MockMap
+            coordinates={route.geometry.coordinates}
+            markers={markers}
+            height={180}
+            label={nextPlace ? `Próximo: ${nextPlace.name} · ${Math.round(nextPlace.dist)} m` : 'Meta cercana'}
+          />
+
+          <View style={styles.metrics}>
+            <View style={styles.metric}>
+              <Text style={styles.metricValue}>{formatDistanceKm(s.distanceM)}</Text>
+              <Text style={styles.metricLabel}>distancia</Text>
+            </View>
+            <View style={styles.metric}>
+              <Text style={styles.metricValue}>{formatDuration(s.durationSec || 0)}</Text>
+              <Text style={styles.metricLabel}>tiempo</Text>
+            </View>
+            <View style={styles.metric}>
+              <Text style={styles.metricValue}>{formatPace(pace)}</Text>
+              <Text style={styles.metricLabel}>ritmo</Text>
+            </View>
+          </View>
+
+          <PaceChart
+            live
+            title="Ritmo por tramo"
+            subtitle={
+              s.splitsKm.length
+                ? `${s.splitsKm.length} km completados · media ${formatPace(s.avgPaceSecPerKm)}`
+                : 'Offline-first · el gráfico crece con tu carrera'
             }
-          >
-            <Text style={styles.discard}>Salir</Text>
-          </Pressable>
-        </View>
+            bars={liveBars}
+          />
 
-        <MockMap
-          coordinates={route.geometry.coordinates}
-          markers={markers}
-          height={200}
-          label={nextPlace ? `Próximo: ${nextPlace.name} · ${Math.round(nextPlace.dist)} m` : 'Meta cercana'}
-        />
-
-        <View style={styles.metrics}>
-          <View style={styles.metric}>
-            <Text style={styles.metricValue}>{formatDistanceKm(s.distanceM)}</Text>
-            <Text style={styles.metricLabel}>distancia</Text>
-          </View>
-          <View style={styles.metric}>
-            <Text style={styles.metricValue}>{formatDuration(s.durationSec || tick)}</Text>
-            <Text style={styles.metricLabel}>tiempo</Text>
-          </View>
-          <View style={styles.metric}>
-            <Text style={styles.metricValue}>{formatPace(pace)}</Text>
-            <Text style={styles.metricLabel}>ritmo</Text>
-          </View>
-        </View>
-
-        {banner ? (
-          <View style={[styles.banner, banner.kind === 'photo' && styles.bannerPhoto]}>
-            <Text style={styles.bannerText}>{banner.text}</Text>
-            {banner.kind === 'story' ? (
-              <Text style={styles.bannerMeta}>Versión {banner.version} · música en duck</Text>
-            ) : (
-              <View style={styles.bannerActions}>
-                <Pressable style={styles.bannerBtn} onPress={capturePhoto}>
-                  <Text style={styles.bannerBtnLabel}>Capturar</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.bannerBtnGhost}
-                  onPress={() => {
-                    track('photo_spot_dismissed', { photoSpotId: banner.photoSpotId });
-                    setBanner(null);
-                  }}
-                >
-                  <Text style={styles.bannerBtnGhostLabel}>Después</Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
-        ) : (
-          <View style={styles.navCard}>
-            <Text style={styles.navTitle}>
-              {nextPlace ? `Hacia ${nextPlace.name}` : 'Último tramo'}
-            </Text>
-            <Text style={styles.navMeta}>
-              GPS demo · offline-first · {s.storyEvents.length} historias
-            </Text>
-          </View>
-        )}
+          {banner ? (
+            <View style={[styles.banner, banner.kind === 'photo' && styles.bannerPhoto]}>
+              <Text style={styles.bannerText}>{banner.text}</Text>
+              {banner.kind === 'story' ? (
+                <Text style={styles.bannerMeta}>Versión {banner.version} · música en duck</Text>
+              ) : (
+                <View style={styles.bannerActions}>
+                  <Pressable style={styles.bannerBtn} onPress={capturePhoto}>
+                    <Text style={styles.bannerBtnLabel}>Capturar</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.bannerBtnGhost}
+                    onPress={() => {
+                      track('photo_spot_dismissed', { photoSpotId: banner.photoSpotId });
+                      setBanner(null);
+                    }}
+                  >
+                    <Text style={styles.bannerBtnGhostLabel}>Después</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.navCard}>
+              <Text style={styles.navTitle}>
+                {nextPlace ? `Hacia ${nextPlace.name}` : 'Último tramo'}
+              </Text>
+              <Text style={styles.navMeta}>
+                GPS demo · offline-first · {s.storyEvents.length} historias
+              </Text>
+            </View>
+          )}
+        </ScrollView>
 
         <View style={styles.controls}>
           <Pressable style={styles.secondaryBtn} onPress={togglePause}>
             <Text style={styles.secondaryLabel}>{paused ? 'Reanudar' : 'Pausar'}</Text>
           </Pressable>
           <Pressable style={styles.finishBtn} onPress={finish}>
-            <Text style={styles.finishLabel}>Finish</Text>
+            <Text style={styles.finishLabel}>Finalizar</Text>
           </Pressable>
         </View>
       </View>
@@ -372,7 +404,11 @@ const styles = StyleSheet.create({
   wrap: {
     flex: 1,
     paddingHorizontal: spacing.lg,
+  },
+  scroll: { flex: 1 },
+  scrollContent: {
     gap: 12,
+    paddingBottom: 12,
   },
   topRow: {
     flexDirection: 'row',
@@ -479,7 +515,7 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 'auto',
+    paddingTop: 8,
   },
   secondaryBtn: {
     flex: 1,
