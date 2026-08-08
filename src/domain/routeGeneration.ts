@@ -1,11 +1,16 @@
-import { getPlacesForCity } from '../data/places';
+import { PLACE_CATALOG_VERSION, blurbForPlace, getPlacesForCity } from '../data/places';
+import { mockSafeRouter } from '../services/routing/mockSafeRouter';
 import type { DiscoveryRoute, Place, PhotoSpot, StoryPoint } from '../types/discovery';
 import type { RouteIntent, RouteStyle } from '../types/routeIntent';
 import { haversineM, lineDistanceM } from './geo';
 
 export const DISTANCE_TOLERANCE = 0.08; // ±8%
+export const DISTANCE_TOLERANCE_IDEAL = 0.05; // ±5%
 
-export function cacheKeyForIntent(intent: RouteIntent, catalogVersion = 'v1'): string {
+export function cacheKeyForIntent(
+  intent: RouteIntent,
+  catalogVersion = PLACE_CATALOG_VERSION,
+): string {
   const geohash5 = `${intent.start.lat.toFixed(2)}_${intent.start.lng.toFixed(2)}`;
   return `${intent.cityId}+${intent.style}+${intent.distanceKm}+${geohash5}+${catalogVersion}`;
 }
@@ -20,7 +25,11 @@ export function isDistanceWithinTolerance(actualM: number, targetKm: number): bo
   return distanceErrorPct(actualM, targetKm) <= DISTANCE_TOLERANCE;
 }
 
-/** Ranking heurístico (fallback sin LLM): relevance + style match + seguridad. */
+export function isDistanceIdeal(actualM: number, targetKm: number): boolean {
+  return distanceErrorPct(actualM, targetKm) <= DISTANCE_TOLERANCE_IDEAL;
+}
+
+/** Ranking heurístico (fallback sin ✦): relevance + style match + seguridad. */
 export function heuristicRankPlaceIds(
   places: Place[],
   style: RouteStyle,
@@ -30,7 +39,13 @@ export function heuristicRankPlaceIds(
     .filter((p) => p.safeForRunning)
     .map((p) => {
       const styleBonus = p.styles.includes(style) ? 0.25 : 0;
-      return { id: p.id, score: p.relevance + styleBonus };
+      const parkBonus =
+        style === 'parks' && p.category === 'park'
+          ? 0.1
+          : style === 'waterfront' && p.category === 'waterfront'
+            ? 0.1
+            : 0;
+      return { id: p.id, score: p.relevance + styleBonus + parkBonus };
     })
     .sort((a, b) => b.score - a.score);
 
@@ -38,14 +53,19 @@ export function heuristicRankPlaceIds(
 }
 
 /**
- * Mock “LLM”: solo reordena IDs del catálogo y escribe blurbs.
+ * Mock ✦: solo reordena IDs del catálogo y escribe blurbs.
  * Nunca inventa lat/lng.
  */
 export function mockLlmSelectPlaces(
   places: Place[],
   style: RouteStyle,
   maxCount: number,
+  forceFallback = false,
 ): { placeIds: string[]; blurbs: Record<string, string>; usedFallback: boolean } {
+  if (forceFallback) {
+    const placeIds = heuristicRankPlaceIds(places, style, maxCount);
+    return { placeIds, blurbs: {}, usedFallback: true };
+  }
   try {
     const ids = heuristicRankPlaceIds(places, style, maxCount);
     // Ligera rotación “editorial” sin tocar coords
@@ -56,7 +76,7 @@ export function mockLlmSelectPlaces(
     const blurbs: Record<string, string> = {};
     for (const id of ids) {
       const p = places.find((x) => x.id === id);
-      if (p) blurbs[id] = `✦ ${p.name}: un momento para sentir la ciudad a pie de calle.`;
+      if (p) blurbs[id] = blurbForPlace(p);
     }
     return { placeIds: ids, blurbs, usedFallback: false };
   } catch {
@@ -65,86 +85,30 @@ export function mockLlmSelectPlaces(
   }
 }
 
-/** Ordena waypoints por nearest-neighbor desde start (router stub). */
-export function orderWaypointsNearest(
-  start: { lat: number; lng: number },
-  places: Place[],
-): Place[] {
-  const remaining = [...places];
-  const ordered: Place[] = [];
-  let cur = start;
-  while (remaining.length) {
-    remaining.sort(
-      (a, b) => haversineM(cur, a) - haversineM(cur, b),
-    );
-    const next = remaining.shift()!;
-    ordered.push(next);
-    cur = next;
-  }
-  return ordered;
-}
-
-/**
- * Router determinístico: polyline visitando waypoints + loops para alcanzar distancia.
- * Solo usa coords del catálogo / start — nunca inventadas por LLM.
- */
+/** @deprecated use mockSafeRouter — kept for tests that import polyline builder */
 export function buildRouterPolyline(
   start: { lat: number; lng: number },
   waypoints: Place[],
   targetDistanceM: number,
 ): [number, number][] {
-  const ordered = orderWaypointsNearest(start, waypoints);
-  const coords: [number, number][] = [[start.lng, start.lat]];
-
-  for (const wp of ordered) {
-    const prev = coords[coords.length - 1];
-    const midLat = (prev[1] + wp.lat) / 2;
-    const midLng = (prev[0] + wp.lng) / 2;
-    // Ligera curva “segura” (parque) sin inventar POIs
-    const bendLat = midLat + (wp.lng - prev[0]) * 0.15;
-    const bendLng = midLng - (wp.lat - prev[1]) * 0.15;
-    coords.push([bendLng, bendLat], [wp.lng, wp.lat]);
-  }
-
-  // Cerrar loop hacia start si ayuda a distancia
-  const last = coords[coords.length - 1];
-  coords.push(
-    [(last[0] + start.lng) / 2 + 0.001, (last[1] + start.lat) / 2 - 0.001],
-    [start.lng, start.lat],
-  );
-
-  let dist = lineDistanceM(coords);
-  let guard = 0;
-  while (dist < targetDistanceM * 0.92 && guard < 8) {
-    // Out-and-back scenic: duplicar un segmento seguro
-    const mid = Math.floor(coords.length / 2);
-    const insert: [number, number][] = [];
-    for (let i = mid; i < Math.min(mid + 3, coords.length - 1); i++) {
-      const [lng, lat] = coords[i];
-      insert.push([lng + 0.0015 * (guard + 1), lat + 0.0012 * (guard + 1)]);
-    }
-    coords.splice(mid, 0, ...insert);
-    dist = lineDistanceM(coords);
-    guard += 1;
-  }
-
-  // Acortar si excedemos mucho: recortar puntos del medio
-  while (dist > targetDistanceM * 1.08 && coords.length > 6) {
-    coords.splice(Math.floor(coords.length / 2), 1);
-    dist = lineDistanceM(coords);
-  }
-
-  return coords;
+  const result = mockSafeRouter.buildDirections({
+    start,
+    waypoints: waypoints.map((w) => ({ lat: w.lat, lng: w.lng })),
+    targetDistanceM,
+    preferSafe: true,
+  });
+  return result.coordinates;
 }
 
-function buildStoryPoint(place: Place, blurb: string, index: number): StoryPoint {
-  const quick = blurb.slice(0, 80) || `✦ ${place.name} en un suspiro.`;
-  const standard = `${blurb} Observa los detalles mientras pasas.`;
-  const deep = `${blurb} Aquí la ciudad cuenta su historia a quien corre con atención: arquitectura, ritmo y luz.`;
+function buildStoryPoint(place: Place, blurb: string): StoryPoint {
+  const base = blurb || blurbForPlace(place);
+  const quick = base.length > 90 ? `${base.slice(0, 87)}…` : base;
+  const standard = `${base} Observa los detalles mientras pasas.`;
+  const deep = `${base} Aquí la ciudad cuenta su historia a quien corre con atención: arquitectura, ritmo y luz.`;
   return {
     id: `sp-${place.id}`,
     placeId: place.id,
-    shortDescription: blurb || `Descubre ${place.name}`,
+    shortDescription: base,
     storyVersions: { quick, standard, deep },
     audio: {
       quick: `cache://audio/${place.id}/quick`,
@@ -171,63 +135,119 @@ function routeNameFor(intent: RouteIntent, firstPlaces: Place[]): string {
   if (intent.style === 'architecture' && intent.cityId === 'barcelona') {
     return 'Modernisme Loop';
   }
+  if (intent.style === 'parks' && intent.cityId === 'barcelona') {
+    return 'Parques & Miradores';
+  }
+  if (intent.style === 'historic' && intent.cityId === 'cdmx') {
+    return 'Centro Histórico Loop';
+  }
   const lead = firstPlaces[0]?.name ?? intent.cityName;
   return `${lead} Discovery`;
 }
 
+function waypointBudget(distanceKm: number, catalogSize: number): number[] {
+  const base =
+    distanceKm <= 5 ? 4 : distanceKm <= 10 ? 7 : distanceKm <= 15 ? 9 : distanceKm <= 21 ? 11 : 12;
+  // Try a few counts around the base to hit distance tolerance
+  const candidates = [base, base + 1, base - 1, base + 2, Math.max(3, base - 2)];
+  return [...new Set(candidates.map((n) => Math.min(catalogSize, Math.max(3, n))))];
+}
+
+/** Keep waypoints runnable: ~40% of target as max crow-fly from start. */
+export function filterPlacesNearStart(
+  places: Place[],
+  start: { lat: number; lng: number },
+  targetDistanceM: number,
+): Place[] {
+  const radius = Math.max(1500, targetDistanceM * 0.4);
+  const near = places.filter((p) => haversineM(start, p) <= radius);
+  if (near.length >= 4) return near;
+  // Fallback: nearest N by distance
+  return [...places]
+    .sort((a, b) => haversineM(start, a) - haversineM(start, b))
+    .slice(0, Math.min(10, places.length));
+}
+
 export function generateDiscoveryRoute(intent: RouteIntent): DiscoveryRoute {
-  const places = getPlacesForCity(intent.cityId, intent.start);
+  const allPlaces = getPlacesForCity(intent.cityId, intent.start);
   const targetM = intent.distanceKm * 1000;
-  const maxPoints = Math.min(
-    places.length,
-    intent.distanceKm <= 5 ? 5 : intent.distanceKm <= 10 ? 8 : intent.distanceKm <= 15 ? 10 : 12,
-  );
+  const places = filterPlacesNearStart(allPlaces, intent.start, targetM);
 
-  const { placeIds, blurbs, usedFallback } = mockLlmSelectPlaces(
-    places,
-    intent.style,
-    maxPoints,
-  );
+  let best: {
+    selected: Place[];
+    blurbs: Record<string, string>;
+    usedFallback: boolean;
+    geometry: [number, number][];
+    distanceM: number;
+    provider: string;
+    err: number;
+  } | null = null;
 
-  // Validación dura: solo IDs del catálogo
-  const byId = new Map(places.map((p) => [p.id, p]));
-  const selected = placeIds
-    .map((id) => byId.get(id))
-    .filter((p): p is Place => Boolean(p));
+  for (const maxPoints of waypointBudget(intent.distanceKm, places.length)) {
+    const { placeIds, blurbs, usedFallback } = mockLlmSelectPlaces(
+      places,
+      intent.style,
+      maxPoints,
+    );
+    const byId = new Map(places.map((p) => [p.id, p]));
+    const selected = placeIds
+      .map((id) => byId.get(id))
+      .filter((p): p is Place => Boolean(p));
 
-  if (selected.some((p) => !byId.has(p.id))) {
-    throw new Error('LLM proposed unknown place id');
+    if (selected.length < 2) continue;
+
+    const directions = mockSafeRouter.buildDirections({
+      start: intent.start,
+      waypoints: selected.map((p) => ({ lat: p.lat, lng: p.lng })),
+      targetDistanceM: targetM,
+      preferSafe: true,
+    });
+
+    const err = distanceErrorPct(directions.distanceM, intent.distanceKm);
+    if (!best || err < best.err) {
+      best = {
+        selected,
+        blurbs,
+        usedFallback,
+        geometry: directions.coordinates,
+        distanceM: directions.distanceM,
+        provider: directions.provider,
+        err,
+      };
+    }
+    if (err <= DISTANCE_TOLERANCE_IDEAL) break;
+    if (err <= DISTANCE_TOLERANCE) break;
   }
 
-  const geometry = buildRouterPolyline(intent.start, selected, targetM);
-  const distanceM = lineDistanceM(geometry);
+  if (!best) {
+    throw new Error('No hay suficientes lugares seguros en el catálogo');
+  }
 
-  // Garantía: coords de story/photo ∈ catálogo
-  const storyPoints = selected.map((p, i) =>
-    buildStoryPoint(p, blurbs[p.id] ?? `✦ ${p.name}`, i),
+  const storyPoints = best.selected.map((p) =>
+    buildStoryPoint(p, best!.blurbs[p.id] ?? blurbForPlace(p)),
   );
-  const photoSpots = selected.map(buildPhotoSpot);
+  const photoSpots = best.selected.map(buildPhotoSpot);
 
   const paceSecPerKm = 340; // ~5:40 /km estimado
-  const estimatedMovingTimeSec = Math.round((distanceM / 1000) * paceSecPerKm);
+  const estimatedMovingTimeSec = Math.round((best.distanceM / 1000) * paceSecPerKm);
 
   return {
     id: `route_${Date.now().toString(36)}`,
-    name: routeNameFor(intent, selected),
+    name: routeNameFor(intent, best.selected),
     intent,
-    geometry: { type: 'LineString', coordinates: geometry },
-    distanceM,
+    geometry: { type: 'LineString', coordinates: best.geometry },
+    distanceM: best.distanceM,
     elevGainM: Math.round(intent.distanceKm * 18),
     estimatedMovingTimeSec,
     storyPoints,
     photoSpots,
     provider: {
-      router: 'mock-osrm-safe',
-      llm: usedFallback ? undefined : 'mock-rank-v1',
+      router: best.provider,
+      llm: best.usedFallback ? undefined : 'mock-rank-v2',
     },
     createdAt: new Date().toISOString(),
     cacheKey: cacheKeyForIntent(intent),
-    usedFallback,
+    usedFallback: best.usedFallback,
   };
 }
 
@@ -249,5 +269,19 @@ export function assertNoInventedGeometry(
         throw new Error(`photo spot coords not in catalog: ${ps.id}`);
       }
     }
+  }
+}
+
+/** Geometry vertices may be router-interpolated; waypoints must stay catalog-only. */
+export function assertRouterOwnedGeometry(route: DiscoveryRoute): void {
+  if (route.geometry.type !== 'LineString') {
+    throw new Error('geometry must be LineString');
+  }
+  if (route.geometry.coordinates.length < 2) {
+    throw new Error('geometry too short');
+  }
+  const dist = lineDistanceM(route.geometry.coordinates);
+  if (Math.abs(dist - route.distanceM) > 25) {
+    throw new Error('distanceM does not match geometry');
   }
 }

@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BatlloBackground } from '../components/BatlloBackground';
+import { formatDistanceKm } from '../domain/geo';
 import { distanceLabel } from '../domain/routeIntent';
-import { generateRoute } from '../services/routeGenerate';
+import { generateRoute, type GenerateProgress } from '../services/routeGenerate';
 import type { DiscoveryRoute } from '../types/discovery';
 import { ROUTE_STYLE_LABELS, type RouteIntent } from '../types/routeIntent';
 import { colors, fonts, radii, spacing } from '../theme';
@@ -14,16 +15,35 @@ type Props = {
   onCancel: () => void;
 };
 
+const PHASE_LABELS: { phase: GenerateProgress['phase']; label: string }[] = [
+  { phase: 'cache', label: 'Ciudad y caché' },
+  { phase: 'places', label: 'Lugares del catálogo' },
+  { phase: 'rank', label: '✦ Orden editorial' },
+  { phase: 'route', label: 'Geometría segura' },
+  { phase: 'validate', label: 'Tolerancia de distancia' },
+];
+
+function phaseIndex(phase: GenerateProgress['phase']): number {
+  const i = PHASE_LABELS.findIndex((p) => p.phase === phase);
+  return i < 0 ? PHASE_LABELS.length : i;
+}
+
 export function GeneratingRouteScreen({ intent, onReady, onCancel }: Props) {
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState('✦ Creando tu ruta…');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
+  const [activePhase, setActivePhase] = useState<GenerateProgress['phase']>('cache');
+  const [doneMeta, setDoneMeta] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setBusy(true);
     setError(null);
+    setDoneMeta(null);
+    setActivePhase('cache');
+    setMessage('✦ Creando tu ruta…');
 
     generateRoute(intent, (p) => {
       if (cancelled) return;
@@ -34,12 +54,20 @@ export function GeneratingRouteScreen({ intent, onReady, onCancel }: Props) {
       }
       if (p.phase === 'done') {
         setMessage(p.message);
+        setActivePhase('validate');
+        const errPct = Math.round(p.distanceErrorPct * 1000) / 10;
+        setDoneMeta(
+          p.fromCache
+            ? `Desde caché · ${formatDistanceKm(p.route.distanceM)} · ${p.route.storyPoints.length} lugares`
+            : `${formatDistanceKm(p.route.distanceM)} · error ${errPct}% · ${p.route.storyPoints.length} lugares`,
+        );
         setBusy(false);
         setTimeout(() => {
           if (!cancelled) onReady(p.route);
-        }, 450);
+        }, 550);
         return;
       }
+      setActivePhase(p.phase);
       setMessage(p.message);
     }).catch((e) => {
       if (cancelled) return;
@@ -50,7 +78,9 @@ export function GeneratingRouteScreen({ intent, onReady, onCancel }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [intent, onReady]);
+  }, [intent, onReady, nonce]);
+
+  const currentIdx = phaseIndex(activePhase);
 
   return (
     <BatlloBackground>
@@ -68,23 +98,40 @@ export function GeneratingRouteScreen({ intent, onReady, onCancel }: Props) {
         <View style={styles.card}>
           {busy ? <ActivityIndicator color={colors.terracotta} size="large" /> : null}
           <Text style={styles.phase}>{error ?? message}</Text>
-          <Text style={styles.hint}>✦ Creando tu ruta…</Text>
+          {doneMeta && !error ? <Text style={styles.doneMeta}>{doneMeta}</Text> : null}
+          {!error ? <Text style={styles.hint}>✦ Creando tu ruta…</Text> : null}
+
+          <View style={styles.steps}>
+            {PHASE_LABELS.map((step, i) => {
+              const done = !error && (Boolean(doneMeta) || i < currentIdx);
+              const active = !error && !doneMeta && i === currentIdx;
+              return (
+                <View key={step.phase} style={styles.stepRow}>
+                  <View
+                    style={[
+                      styles.dot,
+                      done && styles.dotDone,
+                      active && styles.dotActive,
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.stepLabel,
+                      (done || active) && styles.stepLabelHot,
+                    ]}
+                  >
+                    {step.label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
         </View>
 
         {error ? (
           <Pressable
             style={({ pressed }) => [styles.cta, pressed && { opacity: 0.88 }]}
-            onPress={() => {
-              setError(null);
-              setBusy(true);
-              generateRoute(intent, (p) => {
-                if (p.phase === 'done') onReady(p.route);
-                else if (p.phase === 'error') setError(p.message);
-                else setMessage(p.message);
-              }).catch((e) =>
-                setError(e instanceof Error ? e.message : 'Error'),
-              );
-            }}
+            onPress={() => setNonce((n) => n + 1)}
           >
             <Text style={styles.ctaLabel}>Reintentar</Text>
           </Pressable>
@@ -147,10 +194,47 @@ const styles = StyleSheet.create({
     color: colors.ink,
     textAlign: 'center',
   },
+  doneMeta: {
+    fontFamily: fonts.mono,
+    fontSize: 12,
+    color: colors.secondaryText,
+    textAlign: 'center',
+  },
   hint: {
     fontFamily: fonts.bodyMedium,
     fontSize: 13,
     color: colors.terracotta,
+  },
+  steps: {
+    alignSelf: 'stretch',
+    marginTop: 8,
+    gap: 8,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.borders,
+  },
+  dotDone: {
+    backgroundColor: colors.seaGreen,
+  },
+  dotActive: {
+    backgroundColor: colors.terracotta,
+  },
+  stepLabel: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.secondaryText,
+  },
+  stepLabelHot: {
+    color: colors.ink,
+    fontFamily: fonts.bodyMedium,
   },
   cta: {
     marginTop: 28,

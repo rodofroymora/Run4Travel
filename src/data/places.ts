@@ -1,6 +1,9 @@
 import type { Place } from '../types/discovery';
 
-/** Catálogo curado — coords reales; el LLM solo elige IDs de aquí. */
+/** Bump when catalog coords/IDs change — invalidates route cache keys. */
+export const PLACE_CATALOG_VERSION = 'v2';
+
+/** Catálogo curado — coords reales; ✦ solo elige IDs de aquí. */
 export const PLACES_BY_CITY: Record<string, Place[]> = {
   barcelona: [
     {
@@ -123,6 +126,66 @@ export const PLACES_BY_CITY: Record<string, Place[]> = {
       safeForRunning: true,
       styles: ['hidden_gems', 'scenic', 'highlights'],
     },
+    {
+      id: 'bcn-palau-musica',
+      name: 'Palau de la Música',
+      lat: 41.3875,
+      lng: 2.1752,
+      category: 'architecture',
+      relevance: 0.91,
+      safeForRunning: true,
+      styles: ['architecture', 'historic', 'highlights'],
+    },
+    {
+      id: 'bcn-forum',
+      name: 'Parc del Fòrum',
+      lat: 41.4108,
+      lng: 2.2255,
+      category: 'waterfront',
+      relevance: 0.78,
+      safeForRunning: true,
+      styles: ['waterfront', 'scenic', 'parks'],
+    },
+    {
+      id: 'bcn-tibidabo',
+      name: 'Mirador del Tibidabo',
+      lat: 41.4225,
+      lng: 2.1186,
+      category: 'viewpoint',
+      relevance: 0.83,
+      safeForRunning: true,
+      styles: ['scenic', 'parks', 'highlights'],
+    },
+    {
+      id: 'bcn-santa-maria',
+      name: 'Santa Maria del Mar',
+      lat: 41.3839,
+      lng: 2.1821,
+      category: 'historic',
+      relevance: 0.89,
+      safeForRunning: true,
+      styles: ['historic', 'architecture', 'hidden_gems'],
+    },
+    {
+      id: 'bcn-port-vell',
+      name: 'Port Vell',
+      lat: 41.3755,
+      lng: 2.1778,
+      category: 'waterfront',
+      relevance: 0.86,
+      safeForRunning: true,
+      styles: ['waterfront', 'scenic', 'highlights'],
+    },
+    {
+      id: 'bcn-poble-sec',
+      name: 'Poble Sec',
+      lat: 41.3728,
+      lng: 2.1625,
+      category: 'neighborhood',
+      relevance: 0.77,
+      safeForRunning: true,
+      styles: ['hidden_gems', 'scenic', 'parks'],
+    },
   ],
   cdmx: [
     {
@@ -185,7 +248,101 @@ export const PLACES_BY_CITY: Record<string, Place[]> = {
       safeForRunning: true,
       styles: ['hidden_gems', 'architecture'],
     },
+    {
+      id: 'cdmx-cibeles',
+      name: 'Plaza de Cibeles',
+      lat: 19.4208,
+      lng: -99.1665,
+      category: 'landmark',
+      relevance: 0.84,
+      safeForRunning: true,
+      styles: ['highlights', 'architecture', 'scenic'],
+    },
+    {
+      id: 'cdmx-alameda',
+      name: 'Alameda Central',
+      lat: 19.4358,
+      lng: -99.1445,
+      category: 'park',
+      relevance: 0.87,
+      safeForRunning: true,
+      styles: ['parks', 'historic', 'highlights'],
+    },
+    {
+      id: 'cdmx-coyoacan',
+      name: 'Jardín Centenario',
+      lat: 19.3492,
+      lng: -99.1628,
+      category: 'neighborhood',
+      relevance: 0.9,
+      safeForRunning: true,
+      styles: ['historic', 'hidden_gems', 'scenic'],
+    },
+    {
+      id: 'cdmx-unam',
+      name: 'Biblioteca Central UNAM',
+      lat: 19.332,
+      lng: -99.187,
+      category: 'architecture',
+      relevance: 0.86,
+      safeForRunning: true,
+      styles: ['architecture', 'scenic', 'highlights'],
+    },
+    {
+      id: 'cdmx-xochimilco',
+      name: 'Embarcadero de Xochimilco',
+      lat: 19.2575,
+      lng: -99.104,
+      category: 'waterfront',
+      relevance: 0.81,
+      safeForRunning: true,
+      styles: ['waterfront', 'scenic', 'hidden_gems'],
+    },
+    {
+      id: 'cdmx-soumaya',
+      name: 'Museo Soumaya',
+      lat: 19.4408,
+      lng: -99.2047,
+      category: 'architecture',
+      relevance: 0.85,
+      safeForRunning: true,
+      styles: ['architecture', 'highlights', 'scenic'],
+    },
   ],
+};
+
+/** Editorial blurbs keyed by place id — ✦ may rewrite tone, never coords. */
+export const PLACE_BLURBS: Record<string, string> = {
+  'bcn-batllo': 'La fachada de Gaudí respira como un dragón urbano; corre por el Passeig y mírala de reojo.',
+  'bcn-pedrera': 'Ondas de piedra que desafían la línea recta: La Pedrera te pide una mirada lenta.',
+  'bcn-sagrada': 'Torres que aún crecen: la Sagrada marca el ritmo de la ciudad moderna.',
+  'bcn-park-guell': 'Bancos de trencadís y vistas al mar: Park Güell es pausa y color.',
+  'bcn-ciutadella': 'Cascada, sombra y aire libre: Ciutadella es el pulmón del Eixample Este.',
+  'bcn-barceloneta': 'Sal y brisa en el asfalto: Barceloneta cambia el ritmo de tus zancadas.',
+  'bcn-born': 'Calles estrechas, historia densa: El Born premia quien corre con calma.',
+  'bcn-gotic': 'El Gòtic guarda siglos en cada recodo; sigue las aceras anchas.',
+  'bcn-montjuic': 'Mirador y pendiente suave: Montjuïc regala cielo abierto.',
+  'bcn-arc': 'El Arc de Triomf abre el paseo hacia el parque; foto rápida sin frenar.',
+  'bcn-sant-pau': 'Modernisme hospitalario: Sant Pau sorprende lejos del ruido turístico.',
+  'bcn-gracia': 'Plaça del Sol: barrio a escala humana, ideal para hidden gems.',
+  'bcn-palau-musica': 'El Palau brilla con cerámica y música; pasa por la acera del auditorio.',
+  'bcn-forum': 'Horizonte marítimo y espacio amplio: el Fòrum estira la zancada.',
+  'bcn-tibidabo': 'La ciudad a tus pies: Tibidabo es recompensa panorámica.',
+  'bcn-santa-maria': 'Gótico catalán junto al Born: Santa Maria del Mar invita a mirar arriba.',
+  'bcn-port-vell': 'Mástiles y paseo marítimo: Port Vell conecta centro y mar.',
+  'bcn-poble-sec': 'Barrio al pie de Montjuïc: Poble Sec es ritmo local.',
+  'cdmx-zocalo': 'El corazón del país: el Zócalo impone escala y memoria.',
+  'cdmx-bellas': 'Mármol y cúpula: Bellas Artes es arquitectura para detener el aliento.',
+  'cdmx-reforma': 'El Ángel vigila Reforma; corre por la acera amplia y segura.',
+  'cdmx-chapultepec': 'Bosque urbano inmenso: Chapultepec prioriza sombra y seguridad.',
+  'cdmx-condesa': 'Parque México: elipse verde y calma en la Condesa.',
+  'cdmx-roma': 'Plaza Río de Janeiro: Roma Norte a ritmo de barrio.',
+  'cdmx-cibeles': 'Fuente y rotonda: Cibeles ancla la Roma-Condesa.',
+  'cdmx-alameda': 'Alameda Central: paseo histórico entre sombra y ciudad.',
+  'cdmx-coyoacan': 'Jardín Centenario: Coyoacán más íntimo y colonial.',
+  'cdmx-unam': 'Murales y campus: la Biblioteca Central es ícono del siglo XX.',
+  'cdmx-xochimilco': 'Canales y trajineras: Xochimilco es agua y color al sur.',
+  'cdmx-soumaya': 'Escama metálica imposible de ignorar: Soumaya redefine el skyline.',
 };
 
 /** Places genéricos alrededor del centro de una ciudad soportada. */
@@ -214,4 +371,11 @@ export function getPlacesForCity(cityId: string, center: { lat: number; lng: num
     safeForRunning: true,
     styles: ['highlights', 'scenic', 'historic', 'parks'],
   }));
+}
+
+export function blurbForPlace(place: Place): string {
+  return (
+    PLACE_BLURBS[place.id] ??
+    `✦ ${place.name}: un momento para sentir la ciudad a pie de calle.`
+  );
 }

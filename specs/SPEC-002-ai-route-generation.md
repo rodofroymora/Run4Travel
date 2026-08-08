@@ -1,9 +1,18 @@
 # SPEC-002 — ✦ Generación de Discovery Run (AI Route Generation)
 
-**Status:** implemented (client v1 mock)  
+**Status:** hardened (client v1.1 mock)  
 **Golden Path:** ✦ Generate Discovery Run  
 **Depends on:** SPEC-001  
 **Blocks:** SPEC-003, SPEC-005 (audio cache), SPEC-006 (photo ranking)
+
+### Hardening notes (v1.1)
+
+- Catálogo BCN/CDMX ampliado (`PLACE_CATALOG_VERSION=v2`) + blurbs editoriales por ID.
+- Router pluggable `MockSafeRouter` (`src/services/routing/`) — geometría solo del router; ✦ no emite coords.
+- Fitting de distancia ±8% con spurs métricos + filtro de places cercanos al start.
+- Caché AsyncStorage con TTL 7 días e invalidación por versión de catálogo.
+- UX generación: checklist de fases (caché → lugares → ✦ → ruta → validar) + meta de error %.
+- TODO: `EXPO_PUBLIC_MAPBOX_TOKEN` para Directions real (misma interfaz `RouteRouter`).
 
 ---
 

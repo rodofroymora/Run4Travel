@@ -8,19 +8,25 @@ Trabajamos con **trunk** (`main`) y **PRs de corta vida** por **slice demostable
 - Una rama = un incremento que se puede **demostrar** de punta a punta (o un hardening coherente de un tramo del Golden Path).
 - Evitar “una rama retrospectiva por SPEC” cuando el trabajo ya está acoplado en un flujo único.
 
-## Rama actual
+## Rama actual / progreso overnight
 
-`cursor/golden-path-client-v1` (antes `cursor/constitution-ui-spec-001`) concentra el **Golden Path cliente mock v1** (SPEC-001 → SPEC-010): UI Batlló, dominio puro, servicios mock/AsyncStorage y flujo end-to-end sin backend real.
+| Rama | Estado |
+|------|--------|
+| `cursor/gp-route-preview` | SPEC-003 hardened (offline gate + MockMap) |
+| `cursor/gp-route` | SPEC-002 hardened (router mock pluggable, catálogo v2, caché TTL) |
+| `main` | Puede ir detrás hasta FF-merge local de los slices |
 
-## Slices recomendados (hardening futuro)
+Golden Path cliente mock v1 base: `cursor/golden-path-client-v1` / commit en `main` previo al hardening.
 
-| Rama sugerida | Enfoque | Specs a endurecer |
-|---------------|---------|-------------------|
-| `cursor/gp-route-preview` | Preview UI + offline pack gate (mock map) | 003 |
-| `cursor/gp-route` | Router/Mapbox real, geometría fiable | 002 (+ 003 map real) |
-| `cursor/gp-run` | GPS/background real, offline de carrera | 004 + 005 + 006 |
-| `cursor/gp-album-share` | Render/export real del álbum y share | 008 + 009 |
-| `cursor/gp-strava` | OAuth/upload real a Strava (puede ir independiente) | 010 |
+## Slices recomendados
+
+| Rama sugerida | Enfoque | Specs |
+|---------------|---------|-------|
+| `cursor/gp-route-preview` | Preview UI + offline pack gate (mock map) | 003 ✅ |
+| `cursor/gp-route` | Router pluggable + distancia/caché/UX | 002 ✅ (Mapbox real pendiente de token) |
+| `cursor/gp-run` | Live metrics/charts + GPS sim + offline run | 004 + 005 + 006 + 007 |
+| `cursor/gp-album-share` | Render/export álbum y share | 008 + 009 |
+| `cursor/gp-strava` | OAuth mock + outbox Strava | 010 |
 
 Cada slice abre PR contra trunk cuando el demo del hardening esté listo; las specs se actualizan solo si cambia el contrato.
 
