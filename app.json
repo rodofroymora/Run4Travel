@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Run4Travel",
+    "slug": "Run4Travel",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.run4travel.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Run4Travel usa tu ubicación solo para sugerir el punto de partida de tu ruta. Nunca la publica por defecto."
+      }
+    },
+    "android": {
+      "package": "com.run4travel.app",
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+      "adaptiveIcon": {
+        "backgroundColor": "#f6efe3",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Run4Travel usa tu ubicación solo para sugerir el punto de partida de tu ruta. Nunca la publica por defecto."
+        }
+      ]
+    ]
+  }
+}
