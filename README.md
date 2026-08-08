@@ -45,7 +45,7 @@ Flujo cliente sin backend real:
 5. **Resumen** (SPEC-007) — stats y chart desde `RunSession.splitsKm` + card de álbum
 6. **Álbum** (SPEC-008) — cards editoriales, reordenar / ocultar / editar texto
 7. **Compartir** (SPEC-009) — formatos 9:16 / 4:5 / 1:1 / overlay transparente (stub share/save)
-8. **Strava** (SPEC-010, opcional desde resumen) — conectar stub, cola outbox idempotente, flush offline
+8. **Strava** (SPEC-010, opcional desde resumen) — OAuth mock por fases, outbox idempotente, toggle offline/flush
 
 Atajo: tras generar una ruta, en **Hoy** el card muestra esa Discovery Run y *Ver preview / Empezar*.
 

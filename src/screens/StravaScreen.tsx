@@ -1,15 +1,27 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BatlloBackground } from '../components/BatlloBackground';
 import { getRunSession } from '../services/runSessionStore';
+import { beginStravaOAuth, stravaEnvConfigured } from '../services/stravaAuth';
 import {
   connectStravaStub,
+  disconnectStrava,
   flushStravaOutbox,
   getOutbox,
   getStravaConnection,
+  outboxStatusLabel,
   queueStravaUpload,
   setMockNetworkOnline,
+  setStravaAutoSync,
+  stravaActivityDescription,
   stravaActivityName,
 } from '../services/stravaSync';
 import type { RunSession } from '../types/run';
@@ -27,6 +39,7 @@ export function StravaScreen({ session, onBack }: Props) {
   const [jobs, setJobs] = useState<OutboxJob[]>([]);
   const [online, setOnline] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [oauthMsg, setOauthMsg] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setConn(await getStravaConnection());
@@ -38,10 +51,38 @@ export function StravaScreen({ session, onBack }: Props) {
   }, [refresh]);
 
   const job = jobs.find((j) => j.runId === session.id);
+  const pendingCount = jobs.filter((j) => j.status === 'pending' || j.status === 'failed').length;
+
+  const connect = async () => {
+    setBusy(true);
+    setOauthMsg(null);
+    try {
+      const { athleteName } = await beginStravaOAuth('Marta', (p) => {
+        if (p.phase !== 'error') setOauthMsg(p.message);
+        else setOauthMsg(p.message);
+      });
+      const c = await connectStravaStub(athleteName);
+      setConn(c);
+      Alert.alert(
+        'Strava conectado',
+        stravaEnvConfigured()
+          ? 'Client ID detectado; token real aún TODO.'
+          : 'OAuth mock listo (sin secrets). Puedes sincronizar en demo.',
+      );
+    } finally {
+      setBusy(false);
+      setOauthMsg(null);
+    }
+  };
 
   return (
     <BatlloBackground>
-      <View style={[styles.wrap, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.wrap,
+          { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 },
+        ]}
+      >
         <Pressable onPress={onBack}>
           <Text style={styles.back}>← Resumen</Text>
         </Pressable>
@@ -53,6 +94,7 @@ export function StravaScreen({ session, onBack }: Props) {
         <View style={styles.card}>
           <Text style={styles.label}>Actividad</Text>
           <Text style={styles.value}>{stravaActivityName(session)}</Text>
+          <Text style={styles.hint}>{stravaActivityDescription(session)}</Text>
           <Text style={styles.hint}>
             {(session.distanceM / 1000).toFixed(2)} km · {session.storyEvents.length} lugares
           </Text>
@@ -63,30 +105,60 @@ export function StravaScreen({ session, onBack }: Props) {
           <Text style={styles.value}>
             {conn ? `Conectado · ${conn.athleteName}` : 'No conectado'}
           </Text>
-          {!conn ? (
-            <Pressable
-              style={styles.cta}
-              onPress={async () => {
-                const c = await connectStravaStub('Marta');
-                setConn(c);
-                Alert.alert('Strava', 'OAuth stub completado.');
-              }}
-            >
-              <Text style={styles.ctaLabel}>Conectar Strava</Text>
+          {conn ? (
+            <>
+              <Text style={styles.hint}>
+                Desde {new Date(conn.connectedAt).toLocaleString('es-ES')}
+              </Text>
+              <Pressable
+                style={styles.switchRow}
+                onPress={async () => {
+                  const next = await setStravaAutoSync(!conn.autoSync);
+                  if (next) setConn(next);
+                }}
+              >
+                <Text style={styles.switchLabel}>Auto-sync al terminar</Text>
+                <Text style={styles.switchValue}>{conn.autoSync ? 'Sí' : 'No'}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.ghostBtn}
+                onPress={async () => {
+                  await disconnectStrava();
+                  setConn(null);
+                }}
+              >
+                <Text style={styles.ghostLabel}>Desconectar</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Pressable style={[styles.cta, busy && { opacity: 0.7 }]} disabled={busy} onPress={() => void connect()}>
+              <Text style={styles.ctaLabel}>
+                {busy ? 'Autorizando…' : 'Conectar Strava'}
+              </Text>
             </Pressable>
-          ) : null}
+          )}
+          {oauthMsg ? <Text style={styles.oauthMsg}>{oauthMsg}</Text> : null}
+          <Text style={styles.envHint}>
+            {stravaEnvConfigured()
+              ? 'EXPO_PUBLIC_STRAVA_CLIENT_ID presente · OAuth real pendiente'
+              : 'Demo: sin EXPO_PUBLIC_STRAVA_CLIENT_ID (mock OK)'}
+          </Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.label}>Red (demo)</Text>
           <Pressable
+            style={styles.switchRow}
             onPress={() => {
               const next = !online;
               setOnline(next);
               setMockNetworkOnline(next);
             }}
           >
-            <Text style={styles.value}>{online ? 'Online' : 'Offline · cola activa'}</Text>
+            <Text style={styles.switchLabel}>Estado</Text>
+            <Text style={[styles.switchValue, !online && styles.offline]}>
+              {online ? 'Online' : 'Offline · cola activa'}
+            </Text>
           </Pressable>
         </View>
 
@@ -94,11 +166,27 @@ export function StravaScreen({ session, onBack }: Props) {
           <Text style={styles.label}>Outbox</Text>
           <Text style={styles.value}>
             {job
-              ? `${job.status}${job.stravaActivityId ? ` · ${job.stravaActivityId}` : ''}${
-                  job.lastError ? ` · ${job.lastError}` : ''
+              ? `${outboxStatusLabel(job.status)}${
+                  job.stravaActivityId ? ` · ${job.stravaActivityId}` : ''
                 }`
               : 'Sin jobs para este run'}
           </Text>
+          {job?.lastError ? (
+            <Text style={styles.errorHint}>{job.lastError}</Text>
+          ) : null}
+          {pendingCount > 0 ? (
+            <Text style={styles.hint}>{pendingCount} en cola (todas las carreras)</Text>
+          ) : null}
+          {jobs.length > 0 ? (
+            <View style={styles.jobList}>
+              {jobs.slice(0, 5).map((j) => (
+                <Text key={j.id} style={styles.jobRow}>
+                  {j.runId.slice(0, 12)}… · {outboxStatusLabel(j.status)}
+                  {j.attempts ? ` · x${j.attempts}` : ''}
+                </Text>
+              ))}
+            </View>
+          ) : null}
         </View>
 
         <Pressable
@@ -130,7 +218,7 @@ export function StravaScreen({ session, onBack }: Props) {
           }}
         >
           <Text style={styles.ctaLabel}>
-            {busy ? 'Sincronizando…' : 'Sync to Strava'}
+            {busy ? 'Sincronizando…' : 'Sincronizar con Strava'}
           </Text>
         </Pressable>
 
@@ -151,14 +239,13 @@ export function StravaScreen({ session, onBack }: Props) {
         >
           <Text style={styles.secondaryLabel}>Flush outbox (reconexión)</Text>
         </Pressable>
-      </View>
+      </ScrollView>
     </BatlloBackground>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    flex: 1,
     paddingHorizontal: spacing.lg,
     gap: 12,
   },
@@ -204,8 +291,49 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.secondaryText,
   },
-  cta: {
+  errorHint: {
+    marginTop: 6,
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.terracotta,
+  },
+  envHint: {
+    marginTop: 10,
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.secondaryText,
+  },
+  oauthMsg: {
+    marginTop: 8,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    color: colors.seaGreen,
+  },
+  switchRow: {
     marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  switchLabel: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.ink,
+  },
+  switchValue: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 14,
+    color: colors.seaGreen,
+  },
+  offline: { color: colors.terracotta },
+  jobList: { marginTop: 10, gap: 4 },
+  jobRow: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.secondaryText,
+  },
+  cta: {
+    marginTop: 4,
     backgroundColor: colors.terracotta,
     paddingVertical: 14,
     alignItems: 'center',
@@ -215,6 +343,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemi,
     fontSize: 15,
     color: colors.white,
+  },
+  ghostBtn: { marginTop: 10, alignSelf: 'flex-start' },
+  ghostLabel: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    color: colors.terracotta,
   },
   secondary: {
     paddingVertical: 14,

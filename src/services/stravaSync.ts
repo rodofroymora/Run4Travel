@@ -44,8 +44,17 @@ export async function connectStravaStub(athleteName = 'Marta'): Promise<StravaCo
   return conn;
 }
 
+export async function setStravaAutoSync(autoSync: boolean): Promise<StravaConnection | null> {
+  const conn = await getStravaConnection();
+  if (!conn) return null;
+  const next = { ...conn, autoSync };
+  await AsyncStorage.setItem(CONN_KEY, JSON.stringify(next));
+  return next;
+}
+
 export async function disconnectStrava(): Promise<void> {
   await AsyncStorage.removeItem(CONN_KEY);
+  track('strava_disconnected', {});
 }
 
 async function readOutbox(): Promise<OutboxJob[]> {
@@ -120,4 +129,26 @@ export async function flushStravaOutbox(
 
 export function stravaActivityName(session: RunSession): string {
   return `Run4Travel · ${session.routeName} · ${session.cityName}`;
+}
+
+export function stravaActivityDescription(session: RunSession): string {
+  const n = session.storyEvents.length;
+  return n > 0
+    ? `Discovery Run · ${n} ${n === 1 ? 'lugar descubierto' : 'lugares descubiertos'} con Run4Travel ✦`
+    : 'Discovery Run con Run4Travel ✦';
+}
+
+export function outboxStatusLabel(status: OutboxJob['status']): string {
+  switch (status) {
+    case 'pending':
+      return 'Pendiente';
+    case 'succeeded':
+      return 'Sincronizado';
+    case 'failed':
+      return 'Falló · reintento';
+    case 'cancelled':
+      return 'Cancelado';
+    default:
+      return status;
+  }
 }

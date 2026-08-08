@@ -12,9 +12,12 @@ Trabajamos con **trunk** (`main`) y **PRs de corta vida** por **slice demostable
 
 | Rama | Estado |
 |------|--------|
-| `cursor/gp-route-preview` | SPEC-003 hardened (offline gate + MockMap) |
-| `cursor/gp-route` | SPEC-002 hardened (router mock pluggable, catálogo v2, caché TTL) |
-| `main` | Puede ir detrás hasta FF-merge local de los slices |
+| `cursor/gp-route-preview` | SPEC-003 ✅ |
+| `cursor/gp-route` | SPEC-002 ✅ |
+| `cursor/gp-run` | SPEC-004–007 ✅ (live charts) |
+| `cursor/gp-album-share` | SPEC-008–009 ✅ |
+| `cursor/gp-strava` | SPEC-010 ✅ (tip overnight) |
+| `main` | Puede ir detrás hasta FF-merge local de la cadena |
 
 Golden Path cliente mock v1 base: `cursor/golden-path-client-v1` / commit en `main` previo al hardening.
 
@@ -26,7 +29,7 @@ Golden Path cliente mock v1 base: `cursor/golden-path-client-v1` / commit en `ma
 | `cursor/gp-route` | Router pluggable + distancia/caché/UX | 002 ✅ (Mapbox real pendiente de token) |
 | `cursor/gp-run` | Live metrics/charts + GPS sim + offline run | 004–007 (en curso / hardened) |
 | `cursor/gp-album-share` | Editor álbum + export stub UX | 008 + 009 ✅ |
-| `cursor/gp-strava` | OAuth mock + outbox Strava | 010 |
+| `cursor/gp-strava` | OAuth mock + outbox Strava | 010 ✅ |
 
 Cada slice abre PR contra trunk cuando el demo del hardening esté listo; las specs se actualizan solo si cambia el contrato.
 
