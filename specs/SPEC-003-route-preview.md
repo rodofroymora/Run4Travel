@@ -1,9 +1,17 @@
 # SPEC-003 — Preview de ruta, Story Points y Photo Spots
 
-**Status:** implemented (client v1 mock)  
+**Status:** hardened (client v1.1 mock)  
 **Golden Path:** Preview Route + Story Points + Photo Spots  
 **Depends on:** SPEC-002  
 **Blocks:** SPEC-004 (start gate offline)
+
+### Hardening notes (v1.1)
+
+- MockMap: polyline con halo, markers numerados (story) + diamantes (photo), leyenda, inicio/fin.
+- Route Card Batlló: distancia · lugares · tiempo estimado.
+- Carousel horizontal de Story Points + detalle (categoría, audio, texto).
+- Toggle Photo Spots con feedback en mapa.
+- Pack offline: checklist de pasos, barra de progreso, tamaño si >20MB, gate `ready === true` antes de START; cancelar simula pérdida de red (pack parcial, START bloqueado).
 
 ---
 

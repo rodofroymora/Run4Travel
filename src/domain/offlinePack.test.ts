@@ -19,4 +19,12 @@ assert.equal(canStartRun(pack), true);
 
 assert.equal(canStartRun(null), false);
 
+// Pack parcial (p.ej. red caída mid-download) no habilita START
+const partial = withProgress(createEmptyPack('r2'), {
+  geometry: true,
+  storiesText: true,
+});
+assert.equal(partial.ready, false);
+assert.equal(canStartRun(partial), false);
+
 console.log('offlinePack tests: ok');

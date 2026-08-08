@@ -5,6 +5,16 @@ import { track } from './analytics';
 
 const KEY = '@r4t/offline_packs';
 
+export type PackStepKey = 'geometry' | 'storiesText' | 'audio' | 'mapTiles';
+
+export type DownloadOfflinePackOptions = {
+  /** Cancela la descarga (p.ej. pérdida de red). Pack parcial se persiste; ready sigue false. */
+  signal?: { aborted: boolean };
+  /** Falla tras completar este paso (tests / demo de gate). */
+  failAfterStep?: PackStepKey;
+  onProgress?: (pack: OfflinePackStatus) => void;
+};
+
 async function readAll(): Promise<Record<string, OfflinePackStatus>> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
@@ -18,6 +28,12 @@ async function writeAll(map: Record<string, OfflinePackStatus>): Promise<void> {
   await AsyncStorage.setItem(KEY, JSON.stringify(map));
 }
 
+async function persistPack(pack: OfflinePackStatus): Promise<void> {
+  const all = await readAll();
+  all[pack.routeId] = pack;
+  await writeAll(all);
+}
+
 export async function getOfflinePack(routeId: string): Promise<OfflinePackStatus | null> {
   const all = await readAll();
   return all[routeId] ?? null;
@@ -25,28 +41,40 @@ export async function getOfflinePack(routeId: string): Promise<OfflinePackStatus
 
 export async function downloadOfflinePack(
   routeId: string,
-  onProgress?: (pack: OfflinePackStatus) => void,
+  onProgressOrOpts?: ((pack: OfflinePackStatus) => void) | DownloadOfflinePackOptions,
 ): Promise<OfflinePackStatus> {
+  const opts: DownloadOfflinePackOptions =
+    typeof onProgressOrOpts === 'function'
+      ? { onProgress: onProgressOrOpts }
+      : onProgressOrOpts ?? {};
+
   track('offline_pack_download_started', { routeId });
   let pack = createEmptyPack(routeId);
-  onProgress?.(pack);
+  opts.onProgress?.(pack);
+  await persistPack(pack);
 
-  const steps: (keyof OfflinePackStatus)[] = [
-    'geometry',
-    'storiesText',
-    'audio',
-    'mapTiles',
-  ];
+  const steps: PackStepKey[] = ['geometry', 'storiesText', 'audio', 'mapTiles'];
 
   for (const step of steps) {
-    await new Promise((r) => setTimeout(r, 280));
+    if (opts.signal?.aborted) {
+      track('offline_pack_download_failed', { routeId, reason: 'aborted' });
+      throw new Error('Descarga cancelada: sin red o interrumpida');
+    }
+    await new Promise((r) => setTimeout(r, 320));
+    if (opts.signal?.aborted) {
+      track('offline_pack_download_failed', { routeId, reason: 'aborted' });
+      throw new Error('Descarga cancelada: sin red o interrumpida');
+    }
     pack = withProgress(pack, { [step]: true } as Partial<OfflinePackStatus>);
-    onProgress?.(pack);
+    opts.onProgress?.(pack);
+    await persistPack(pack);
+
+    if (opts.failAfterStep === step) {
+      track('offline_pack_download_failed', { routeId, reason: 'network' });
+      throw new Error('Sin conexión: no se pudo completar el pack offline');
+    }
   }
 
-  const all = await readAll();
-  all[routeId] = pack;
-  await writeAll(all);
   track('offline_pack_download_completed', { routeId });
   return pack;
 }

@@ -16,7 +16,8 @@ Trabajamos con **trunk** (`main`) y **PRs de corta vida** por **slice demostable
 
 | Rama sugerida | Enfoque | Specs a endurecer |
 |---------------|---------|-------------------|
-| `cursor/gp-route` | Router/Mapbox real, geometría fiable | 002 + 003 |
+| `cursor/gp-route-preview` | Preview UI + offline pack gate (mock map) | 003 |
+| `cursor/gp-route` | Router/Mapbox real, geometría fiable | 002 (+ 003 map real) |
 | `cursor/gp-run` | GPS/background real, offline de carrera | 004 + 005 + 006 |
 | `cursor/gp-album-share` | Render/export real del álbum y share | 008 + 009 |
 | `cursor/gp-strava` | OAuth/upload real a Strava (puede ir independiente) | 010 |

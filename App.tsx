@@ -130,14 +130,17 @@ export default function App() {
         <RoutePreviewScreen
           route={route}
           onBack={goHome}
-          onStart={() => setScreen('run')}
+          onStart={() => {
+            // Gate offline ya validado en RoutePreviewScreen (ready === true)
+            setScreen('run');
+          }}
         />
       )}
       {screen === 'run' && route && (
         <ActiveRunScreen
           route={route}
           onFinished={onRunFinished}
-          onDiscard={goHome}
+          onDiscard={() => setScreen('preview')}
         />
       )}
       {screen === 'summary' && session && route && (
