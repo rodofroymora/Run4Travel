@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, fonts, radii } from '../theme';
 
-const BARS = [
+const DEFAULT_BARS = [
   { h: 28, color: colors.seaGreen },
   { h: 44, color: colors.seaGreen },
   { h: 36, color: colors.mosaicYellow },
@@ -17,17 +17,19 @@ const BARS = [
 type Props = {
   title?: string;
   subtitle?: string;
+  bars?: { h: number; color: string }[];
 };
 
 export function PaceChart({
   title = 'Ritmo por tramo',
   subtitle = 'narración adaptada 3 veces',
+  bars = DEFAULT_BARS,
 }: Props) {
   return (
     <View style={styles.card}>
       <Text style={styles.title}>{title}</Text>
       <View style={styles.chart}>
-        {BARS.map((bar, i) => (
+        {bars.map((bar, i) => (
           <View key={i} style={styles.barTrack}>
             <View
               style={[

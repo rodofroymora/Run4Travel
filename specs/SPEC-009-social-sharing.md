@@ -1,6 +1,6 @@
 # SPEC-009 — Social Sharing & exports
 
-**Status:** draft  
+**Status:** implemented (client v1 mock)  
 **Golden Path:** Share to Instagram / Social  
 **Depends on:** SPEC-008 (o summary share mínimo)  
 **Blocks:** —

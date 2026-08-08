@@ -11,6 +11,8 @@ import { BatlloBackground } from '../components/BatlloBackground';
 import { CeramicScales } from '../components/CeramicScales';
 import { TabBar } from '../components/TabBar';
 import { TrencadisMark } from '../components/TrencadisMark';
+import { getPlacesForCity } from '../data/places';
+import type { DiscoveryRoute } from '../types/discovery';
 import { colors, fonts, radii, spacing, type TabId } from '../theme';
 
 type Props = {
@@ -19,6 +21,7 @@ type Props = {
   onStartRun?: () => void;
   activeTab?: TabId;
   onTabChange?: (tab: TabId) => void;
+  readyRoute?: DiscoveryRoute | null;
 };
 
 export function HomeScreen({
@@ -27,8 +30,26 @@ export function HomeScreen({
   onStartRun,
   activeTab = 'Hoy',
   onTabChange,
+  readyRoute,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const stories = readyRoute?.storyPoints.length ?? 14;
+  const routeTitle = readyRoute?.name ?? 'Modernisme Loop';
+  const distanceTag = readyRoute
+    ? `${Math.round(readyRoute.distanceM / 1000)}K`
+    : '10K';
+  const pathLabel = readyRoute
+    ? readyRoute.storyPoints
+        .slice(0, 3)
+        .map((sp) => {
+          const p = getPlacesForCity(
+            readyRoute.intent.cityId,
+            readyRoute.intent.start,
+          ).find((x) => x.id === sp.placeId);
+          return p?.name ?? sp.placeId;
+        })
+        .join(' → ')
+    : 'Casa Batlló → La Pedrera → Sagrada Família';
 
   return (
     <BatlloBackground>
@@ -43,7 +64,9 @@ export function HomeScreen({
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={styles.title}>Corre {cityName}</Text>
-            <Text style={styles.subtitle}>14 historias te esperan hoy</Text>
+            <Text style={styles.subtitle}>
+              {stories} historias te esperan hoy
+            </Text>
           </View>
           <TrencadisMark size={40} />
         </View>
@@ -63,11 +86,9 @@ export function HomeScreen({
 
         <View style={styles.routeCard}>
           <CeramicScales />
-          <Text style={styles.routeTag}>RUTA IA · 10K</Text>
-          <Text style={styles.routeTitle}>Modernisme Loop</Text>
-          <Text style={styles.routePath}>
-            Casa Batlló → La Pedrera → Sagrada Família
-          </Text>
+          <Text style={styles.routeTag}>RUTA IA · {distanceTag}</Text>
+          <Text style={styles.routeTitle}>{routeTitle}</Text>
+          <Text style={styles.routePath}>{pathLabel}</Text>
           <Pressable
             style={({ pressed }) => [styles.startBtn, pressed && styles.pressed]}
             onPress={onStartRun}
@@ -79,7 +100,9 @@ export function HomeScreen({
                 <Path d="M3 1.5v9l8-4.5-8-4.5Z" fill={colors.white} />
               </Svg>
             </View>
-            <Text style={styles.startLabel}>Empezar a correr</Text>
+            <Text style={styles.startLabel}>
+              {readyRoute ? 'Ver preview / Empezar' : 'Crear ruta primero'}
+            </Text>
           </Pressable>
         </View>
 

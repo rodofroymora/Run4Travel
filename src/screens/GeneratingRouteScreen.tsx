@@ -3,36 +3,54 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BatlloBackground } from '../components/BatlloBackground';
 import { distanceLabel } from '../domain/routeIntent';
+import { generateRoute } from '../services/routeGenerate';
+import type { DiscoveryRoute } from '../types/discovery';
 import { ROUTE_STYLE_LABELS, type RouteIntent } from '../types/routeIntent';
 import { colors, fonts, radii, spacing } from '../theme';
 
 type Props = {
   intent: RouteIntent;
-  onDone: () => void;
+  onReady: (route: DiscoveryRoute) => void;
+  onCancel: () => void;
 };
 
-/** Placeholder bridge hacia SPEC-002. */
-export function GeneratingRouteScreen({ intent, onDone }: Props) {
+export function GeneratingRouteScreen({ intent, onReady, onCancel }: Props) {
   const insets = useSafeAreaInsets();
-  const [phase, setPhase] = useState(0);
+  const [message, setMessage] = useState('✦ Creando tu ruta…');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(true);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase(1), 900);
-    const t2 = setTimeout(() => setPhase(2), 1800);
-    const t3 = setTimeout(() => setPhase(3), 2700);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-    };
-  }, []);
+    let cancelled = false;
+    setBusy(true);
+    setError(null);
 
-  const lines = [
-    `Explorando ${intent.cityName}…`,
-    'Eligiendo lugares con alma…',
-    'Trazando una ruta segura…',
-    'Listo — SPEC-002 conectará el motor real.',
-  ];
+    generateRoute(intent, (p) => {
+      if (cancelled) return;
+      if (p.phase === 'error') {
+        setError(p.message);
+        setBusy(false);
+        return;
+      }
+      if (p.phase === 'done') {
+        setMessage(p.message);
+        setBusy(false);
+        setTimeout(() => {
+          if (!cancelled) onReady(p.route);
+        }, 450);
+        return;
+      }
+      setMessage(p.message);
+    }).catch((e) => {
+      if (cancelled) return;
+      setError(e instanceof Error ? e.message : 'No pudimos crear la ruta');
+      setBusy(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [intent, onReady]);
 
   return (
     <BatlloBackground>
@@ -48,20 +66,33 @@ export function GeneratingRouteScreen({ intent, onDone }: Props) {
         </Text>
 
         <View style={styles.card}>
-          {phase < 3 ? (
-            <ActivityIndicator color={colors.terracotta} size="large" />
-          ) : null}
-          <Text style={styles.phase}>{lines[phase]}</Text>
+          {busy ? <ActivityIndicator color={colors.terracotta} size="large" /> : null}
+          <Text style={styles.phase}>{error ?? message}</Text>
+          <Text style={styles.hint}>✦ Creando tu ruta…</Text>
         </View>
 
-        {phase >= 3 ? (
+        {error ? (
           <Pressable
             style={({ pressed }) => [styles.cta, pressed && { opacity: 0.88 }]}
-            onPress={onDone}
+            onPress={() => {
+              setError(null);
+              setBusy(true);
+              generateRoute(intent, (p) => {
+                if (p.phase === 'done') onReady(p.route);
+                else if (p.phase === 'error') setError(p.message);
+                else setMessage(p.message);
+              }).catch((e) =>
+                setError(e instanceof Error ? e.message : 'Error'),
+              );
+            }}
           >
-            <Text style={styles.ctaLabel}>Volver a Hoy</Text>
+            <Text style={styles.ctaLabel}>Reintentar</Text>
           </Pressable>
-        ) : null}
+        ) : (
+          <Pressable onPress={onCancel} hitSlop={12} style={styles.cancel}>
+            <Text style={styles.cancelLabel}>Cancelar</Text>
+          </Pressable>
+        )}
       </View>
     </BatlloBackground>
   );
@@ -107,7 +138,7 @@ const styles = StyleSheet.create({
     borderColor: colors.borders,
     padding: 28,
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
     ...radii.cardSoft,
   },
   phase: {
@@ -115,6 +146,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.ink,
     textAlign: 'center',
+  },
+  hint: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    color: colors.terracotta,
   },
   cta: {
     marginTop: 28,
@@ -129,5 +165,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemi,
     fontSize: 16,
     color: colors.white,
+  },
+  cancel: { marginTop: 20 },
+  cancelLabel: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.secondaryText,
   },
 });

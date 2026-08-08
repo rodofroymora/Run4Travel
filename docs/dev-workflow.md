@@ -1,0 +1,31 @@
+# Flujo de desarrollo — Run4Travel
+
+## Enfoque de branching
+
+Trabajamos con **trunk** (`main`) y **PRs de corta vida** por **slice demostable**, no con una rama por SPEC por defecto.
+
+- Las specs en `specs/` son el **contrato** (qué debe cumplirse), no el tamaño de la rama.
+- Una rama = un incremento que se puede **demostrar** de punta a punta (o un hardening coherente de un tramo del Golden Path).
+- Evitar “una rama retrospectiva por SPEC” cuando el trabajo ya está acoplado en un flujo único.
+
+## Rama actual
+
+`cursor/golden-path-client-v1` (antes `cursor/constitution-ui-spec-001`) concentra el **Golden Path cliente mock v1** (SPEC-001 → SPEC-010): UI Batlló, dominio puro, servicios mock/AsyncStorage y flujo end-to-end sin backend real.
+
+## Slices recomendados (hardening futuro)
+
+| Rama sugerida | Enfoque | Specs a endurecer |
+|---------------|---------|-------------------|
+| `cursor/gp-route` | Router/Mapbox real, geometría fiable | 002 + 003 |
+| `cursor/gp-run` | GPS/background real, offline de carrera | 004 + 005 + 006 |
+| `cursor/gp-album-share` | Render/export real del álbum y share | 008 + 009 |
+| `cursor/gp-strava` | OAuth/upload real a Strava (puede ir independiente) | 010 |
+
+Cada slice abre PR contra trunk cuando el demo del hardening esté listo; las specs se actualizan solo si cambia el contrato.
+
+## Regla práctica
+
+1. Elige el **slice demostable** (no el número de SPEC).
+2. Implementa contra los contratos en `specs/`.
+3. Abre un PR corto; merge a trunk; borra la rama.
+4. El siguiente hardening nace de trunk limpio.

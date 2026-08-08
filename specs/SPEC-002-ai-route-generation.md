@@ -1,6 +1,6 @@
 # SPEC-002 — ✦ Generación de Discovery Run (AI Route Generation)
 
-**Status:** draft  
+**Status:** implemented (client v1 mock)  
 **Golden Path:** ✦ Generate Discovery Run  
 **Depends on:** SPEC-001  
 **Blocks:** SPEC-003, SPEC-005 (audio cache), SPEC-006 (photo ranking)

@@ -1,4 +1,9 @@
+export { ActiveRunScreen } from './ActiveRunScreen';
+export { AlbumScreen } from './AlbumScreen';
 export { CreateRouteScreen } from './CreateRouteScreen';
 export { GeneratingRouteScreen } from './GeneratingRouteScreen';
 export { HomeScreen } from './HomeScreen';
+export { RoutePreviewScreen } from './RoutePreviewScreen';
+export { ShareScreen } from './ShareScreen';
+export { StravaScreen } from './StravaScreen';
 export { SummaryScreen } from './SummaryScreen';

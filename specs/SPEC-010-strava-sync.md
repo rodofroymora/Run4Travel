@@ -1,6 +1,6 @@
 # SPEC-010 — Sync de actividad a Strava
 
-**Status:** draft  
+**Status:** implemented (client v1 mock)  
 **Golden Path:** Sync to Strava  
 **Depends on:** SPEC-004 / SPEC-007  
 **Blocks:** —

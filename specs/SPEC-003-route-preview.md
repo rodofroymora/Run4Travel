@@ -1,6 +1,6 @@
 # SPEC-003 — Preview de ruta, Story Points y Photo Spots
 
-**Status:** draft  
+**Status:** implemented (client v1 mock)  
 **Golden Path:** Preview Route + Story Points + Photo Spots  
 **Depends on:** SPEC-002  
 **Blocks:** SPEC-004 (start gate offline)

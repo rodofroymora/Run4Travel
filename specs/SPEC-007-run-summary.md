@@ -1,6 +1,6 @@
 # SPEC-007 — Resumen post-carrera
 
-**Status:** draft  
+**Status:** implemented (client v1 mock)  
 **Golden Path:** Running Summary  
 **Depends on:** SPEC-004  
 **Blocks:** SPEC-008 (trigger álbum)

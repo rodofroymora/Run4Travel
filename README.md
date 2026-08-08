@@ -8,7 +8,8 @@ App móvil que combina running, travel, AI storytelling, fotografía y comunidad
 
 - **[CONSTITUTION.md](./CONSTITUTION.md)** — visión de producto, Golden Path, Batlló Design System y reglas de Spec-Driven Development.
 - **[assets/references/batllo-home-summary-mock.png](./assets/references/batllo-home-summary-mock.png)** — mock de referencia (Hoy + Resumen).
-- **[specs/](./specs/)** — specs de features (obligatorias antes de implementar, §23). Golden Path: SPEC-001 → SPEC-010.
+- **[specs/](./specs/)** — specs de features (SPEC-001 → SPEC-010, client v1 mock implementado).
+- **[docs/dev-workflow.md](./docs/dev-workflow.md)** — branching por slice demostable (no una rama por SPEC por defecto).
 
 ## Stack
 
@@ -17,6 +18,7 @@ App móvil que combina running, travel, AI storytelling, fotografía y comunidad
 | App | Expo (React Native) + TypeScript |
 | Design system | Batlló (`src/theme`) |
 | Tipografía | Gabarito · Instrument Sans · JetBrains Mono |
+| Persistencia demo | AsyncStorage (rutas, packs, runs, álbum, Strava outbox) |
 
 ## Arranque
 
@@ -27,22 +29,48 @@ npm start
 
 Luego `i` (iOS), `a` (Android) o `w` (web).
 
-**Demo UI:**
-- **Hoy** → *✦ Crear ruta con IA* → wizard SPEC-001 (ciudad → partida → distancia → estilo) → placeholder SPEC-002
-- **Hoy** → *Empezar a correr* → Resumen post-carrera (mock)
+```bash
+npm run typecheck
+npm test
+```
+
+## Demo Golden Path (end-to-end)
+
+Flujo cliente sin backend real:
+
+1. **Hoy** → *✦ Crear ruta con IA* → wizard SPEC-001 (ciudad → partida → distancia → estilo)
+2. **✦ Creando tu ruta…** (SPEC-002) — ranking mock de places del catálogo + polyline del router determinístico → caché
+3. **Preview** (SPEC-003) — mapa mock, story/photo cards → *Empezar a correr* descarga pack offline
+4. **Carrera activa** (SPEC-004/005/006) — GPS simulado, ritmo/distancia, banners `✦ Te acercas a…`, photo spots con safety gate → *Finish*
+5. **Resumen** (SPEC-007) — stats reales de la sesión + card de álbum
+6. **Álbum** (SPEC-008) — cards editoriales, reordenar / ocultar / editar texto
+7. **Compartir** (SPEC-009) — formatos 9:16 / 4:5 / 1:1 / overlay transparente (stub share/save)
+8. **Strava** (SPEC-010, opcional desde resumen) — conectar stub, cola outbox idempotente, flush offline
+
+Atajo: tras generar una ruta, en **Hoy** el card muestra esa Discovery Run y *Ver preview / Empezar*.
 
 ## Estructura
 
 ```
-CONSTITUTION.md          # Constitución del producto
-specs/                   # Feature specs (Spec-Driven)
-docs/design/             # Notas del design system
+CONSTITUTION.md
+specs/                   # Feature specs
 src/
   theme/                 # Tokens Batlló
-  components/            # UI reutilizable
-  screens/               # Pantallas
-assets/references/       # Mocks y referencias visuales
+  components/            # UI (MockMap, etc.)
+  screens/               # Golden Path screens
+  domain/                # Lógica pura + tests
+  services/              # Mocks / AsyncStorage
+  data/                  # Cities + places catalog
+  types/
 ```
+
+## Stubs / limitaciones intencionales (v1 mock)
+
+- Sin Mapbox/OSRM real — polyline determinística sobre coords del catálogo
+- Sin LLM/TTS de red — ranking heurístico + blurbs locales; audio = URI cache stub
+- GPS simulado a lo largo de la polyline (no `expo-location` en run)
+- Share / cámara / Strava OAuth = stubs (sin APIs externas)
+- Mapa estilizado SVG (no SDK de mapas)
 
 ## North Star
 

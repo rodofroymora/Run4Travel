@@ -1,6 +1,6 @@
 # SPEC-005 — Pace-aware AI Storytelling + Music ducking
 
-**Status:** draft  
+**Status:** implemented (client v1 mock)  
 **Golden Path:** Music → AI Story → Music resumes  
 **Depends on:** SPEC-002 (stories), SPEC-004 (pace/ETA)  
 **Blocks:** — (enriquece run)

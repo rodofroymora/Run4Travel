@@ -1,6 +1,6 @@
 # SPEC-006 — Photo Spots
 
-**Status:** draft  
+**Status:** implemented (client v1 mock)  
 **Golden Path:** 📸 Photo Spot  
 **Depends on:** SPEC-002 (spots), SPEC-004 (location)  
 **Blocks:** SPEC-008 (album inputs)

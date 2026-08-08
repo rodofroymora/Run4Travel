@@ -1,6 +1,6 @@
 # SPEC-004 — Carrera activa: tracking, navegación y métricas
 
-**Status:** draft  
+**Status:** implemented (client v1 mock)  
 **Golden Path:** START RUN → Navigation → Continue Running → FINISH  
 **Depends on:** SPEC-003 (offline ready)  
 **Blocks:** SPEC-005, SPEC-006, SPEC-007

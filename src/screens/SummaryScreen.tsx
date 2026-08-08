@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -9,17 +10,83 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BatlloBackground } from '../components/BatlloBackground';
 import { MedalBadge } from '../components/MedalBadge';
 import { PaceChart } from '../components/PaceChart';
+import { formatDistanceKm, formatDuration, formatPace } from '../domain/geo';
+import { buildRunSummary, medalLabel } from '../domain/runSummary';
+import { track } from '../services/analytics';
+import { generateAlbumForRun, getAlbumByRunId } from '../services/albumStore';
+import type { DiscoveryRoute } from '../types/discovery';
+import type { RunSession, RunSummary } from '../types/run';
 import { colors, fonts, radii, spacing } from '../theme';
 
 type Props = {
+  session: RunSession;
+  route: DiscoveryRoute;
   onBack?: () => void;
   onShare?: () => void;
   onSave?: () => void;
   onViewAlbum?: () => void;
+  onStrava?: () => void;
 };
 
-export function SummaryScreen({ onBack, onShare, onSave, onViewAlbum }: Props) {
+export function SummaryScreen({
+  session,
+  route,
+  onBack,
+  onShare,
+  onSave,
+  onViewAlbum,
+  onStrava,
+}: Props) {
   const insets = useSafeAreaInsets();
+  const [albumStatus, setAlbumStatus] = useState<RunSummary['albumStatus']>('pending');
+
+  useEffect(() => {
+    let cancelled = false;
+    track('summary_viewed', { runId: session.id });
+
+    (async () => {
+      const existing = await getAlbumByRunId(session.id);
+      if (existing) {
+        if (!cancelled) setAlbumStatus('ready');
+        return;
+      }
+      try {
+        await generateAlbumForRun(session, route, true);
+        if (!cancelled) setAlbumStatus('ready');
+      } catch {
+        if (!cancelled) setAlbumStatus('failed');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, route]);
+
+  const summary = useMemo(
+    () => buildRunSummary(session, albumStatus),
+    [session, albumStatus],
+  );
+
+  useEffect(() => {
+    if (summary.discoveryRunCompleted) {
+      track('discovery_run_completed', {
+        stories: summary.storiesListened,
+        photos: summary.photoCount,
+        cityId: summary.cityId,
+      });
+    }
+  }, [summary.discoveryRunCompleted, summary]);
+
+  const splitBars = summary.splits.length
+    ? summary.splits.slice(0, 10).map((s) => {
+        const pace = s.paceSec;
+        const color =
+          pace < 320 ? colors.seaGreen : pace < 360 ? colors.mosaicYellow : colors.terracotta;
+        const h = Math.min(64, Math.max(20, 80 - (pace - 280) / 3));
+        return { h, color };
+      })
+    : undefined;
 
   return (
     <BatlloBackground>
@@ -36,94 +103,96 @@ export function SummaryScreen({ onBack, onShare, onSave, onViewAlbum }: Props) {
         </Pressable>
 
         <View style={styles.hero}>
-          <MedalBadge label={'10K\nCOMPLETADA'} size={120} />
+          <MedalBadge label={medalLabel(summary.distanceM)} size={120} />
           <Text style={styles.greeting}>¡Molt bé, Marta!</Text>
-          <Text style={styles.runMeta}>Modernisme Loop · Barcelona · 7:02 am</Text>
+          <Text style={styles.runMeta}>
+            {summary.routeName} · {summary.cityName} · {summary.finishedAtLocal}
+          </Text>
         </View>
 
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, radii.cardStat]}>
-            <Text style={styles.statValue}>10.24 km</Text>
+            <Text style={styles.statValue}>{formatDistanceKm(summary.distanceM)}</Text>
             <Text style={styles.statLabel}>distancia</Text>
           </View>
-          <View
-            style={[
-              styles.statCard,
-              {
-                borderTopLeftRadius: 36,
-                borderTopRightRadius: 28,
-                borderBottomRightRadius: 40,
-                borderBottomLeftRadius: 24,
-              },
-            ]}
-          >
-            <Text style={styles.statValue}>57:48</Text>
+          <View style={[styles.statCard, styles.r1]}>
+            <Text style={styles.statValue}>{formatDuration(summary.durationSec)}</Text>
             <Text style={styles.statLabel}>tiempo</Text>
           </View>
-          <View
-            style={[
-              styles.statCard,
-              {
-                borderTopLeftRadius: 24,
-                borderTopRightRadius: 40,
-                borderBottomRightRadius: 28,
-                borderBottomLeftRadius: 36,
-              },
-            ]}
-          >
-            <Text style={styles.statValue}>5:38 /km</Text>
+          <View style={[styles.statCard, styles.r2]}>
+            <Text style={styles.statValue}>{formatPace(summary.avgPaceSecPerKm)}</Text>
             <Text style={styles.statLabel}>
-              ritmo · PB <Text style={styles.spark}>✦</Text>
+              ritmo{summary.isPacePb ? ' · PB ' : ''}
+              {summary.isPacePb ? <Text style={styles.spark}>✦</Text> : null}
             </Text>
           </View>
-          <View
-            style={[
-              styles.statCard,
-              {
-                borderTopLeftRadius: 40,
-                borderTopRightRadius: 24,
-                borderBottomRightRadius: 36,
-                borderBottomLeftRadius: 28,
-              },
-            ]}
-          >
-            <Text style={styles.statValue}>14</Text>
+          <View style={[styles.statCard, styles.r3]}>
+            <Text style={styles.statValue}>{summary.storiesListened}</Text>
             <Text style={styles.statLabel}>historias escuchadas</Text>
           </View>
         </View>
 
         <View style={styles.block}>
-          <PaceChart />
+          <PaceChart
+            subtitle={
+              summary.narrationAdaptations
+                ? `narración adaptada ${summary.narrationAdaptations} veces`
+                : `${summary.photoCount} fotos · discovery`
+            }
+            bars={splitBars}
+          />
         </View>
 
         <Pressable
           style={({ pressed }) => [styles.albumCard, pressed && styles.pressed]}
-          onPress={onViewAlbum}
+          onPress={() => {
+            track('album_cta_tapped', { status: albumStatus });
+            onViewAlbum?.();
+          }}
         >
           <View style={styles.albumIcon}>
             <Text style={styles.albumSpark}>✦</Text>
           </View>
           <View style={styles.albumInfo}>
-            <Text style={styles.albumTitle}>Tu álbum está listo</Text>
-            <Text style={styles.albumMeta}>6 fotos editadas · Modernisme Loop</Text>
+            <Text style={styles.albumTitle}>
+              {albumStatus === 'ready'
+                ? 'Tu álbum está listo'
+                : albumStatus === 'failed'
+                  ? 'Álbum con plantilla local'
+                  : '✦ Preparando tu álbum…'}
+            </Text>
+            <Text style={styles.albumMeta}>
+              {summary.photoCount} fotos · {summary.routeName}
+            </Text>
           </View>
           <Text style={styles.albumAction}>Ver →</Text>
         </Pressable>
 
         <Pressable
           style={({ pressed }) => [styles.shareBtn, pressed && styles.pressed]}
-          onPress={onShare}
-          accessibilityRole="button"
+          onPress={() => {
+            track('share_cta_tapped');
+            onShare?.();
+          }}
         >
           <Text style={styles.shareLabel}>Compartir carrera</Text>
         </Pressable>
 
         <Pressable
           style={({ pressed }) => [styles.saveBtn, pressed && styles.pressed]}
-          onPress={onSave}
-          accessibilityRole="button"
+          onPress={() => {
+            track('save_tapped');
+            onSave?.();
+          }}
         >
           <Text style={styles.saveLabel}>Guardar</Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [styles.stravaBtn, pressed && styles.pressed]}
+          onPress={onStrava}
+        >
+          <Text style={styles.stravaLabel}>Sync to Strava</Text>
         </Pressable>
       </ScrollView>
     </BatlloBackground>
@@ -179,6 +248,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     minHeight: 88,
     justifyContent: 'center',
+  },
+  r1: {
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 28,
+    borderBottomRightRadius: 40,
+    borderBottomLeftRadius: 24,
+  },
+  r2: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 40,
+    borderBottomRightRadius: 28,
+    borderBottomLeftRadius: 36,
+  },
+  r3: {
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 36,
+    borderBottomLeftRadius: 28,
   },
   statValue: {
     fontFamily: fonts.monoBold,
@@ -261,11 +348,21 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     borderRadius: 999,
+    marginBottom: 10,
   },
   saveLabel: {
     fontFamily: fonts.bodySemi,
     fontSize: 15,
     color: colors.ink,
+  },
+  stravaBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  stravaLabel: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.mediterraneanBlue,
   },
   pressed: { opacity: 0.88 },
 });

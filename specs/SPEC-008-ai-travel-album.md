@@ -1,6 +1,6 @@
 # SPEC-008 — ✦ AI Travel Album + Editor
 
-**Status:** draft  
+**Status:** implemented (client v1 mock)  
 **Golden Path:** ✦ AI generates Travel Album → Preview → Customize  
 **Depends on:** SPEC-007, SPEC-006 (fotos), SPEC-004  
 **Blocks:** SPEC-009
