@@ -66,17 +66,17 @@ src/
 
 ## Stubs / limitaciones intencionales (v1 mock)
 
-- Sin Mapbox/OSRM real — `MockSafeRouter` determinístico (interfaz lista para Mapbox)
+- Mapbox Directions opcional — con `EXPO_PUBLIC_MAPBOX_TOKEN` usa `MapboxSafeRouter` (walking); sin token o si falla → `MockSafeRouter`
 - Sin LLM/TTS de red — ranking heurístico + blurbs locales; audio = URI cache stub
 - GPS simulado a lo largo de la polyline (no `expo-location` en run)
 - Share / cámara / Strava OAuth = stubs (sin APIs externas)
 - Mapa estilizado SVG (no SDK de mapas)
 
-### Env stubs (sin keys de pago requeridas para demo)
+### Env (ver `.env.example`)
 
 | Variable | Uso | Estado |
 |----------|-----|--------|
-| `EXPO_PUBLIC_MAPBOX_TOKEN` | Directions / tiles reales | TODO — sin token usa `MockSafeRouter` |
+| `EXPO_PUBLIC_MAPBOX_TOKEN` | Directions walking reales | Activo si está en `.env` |
 | `EXPO_PUBLIC_STRAVA_CLIENT_ID` / `SECRET` | OAuth Strava | TODO — pantalla usa connect mock |
 | `EXPO_PUBLIC_LLM_API_KEY` | Rank/order remoto de place IDs | TODO — mock ✦ local |
 

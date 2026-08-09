@@ -1,6 +1,6 @@
 # SPEC-002 — ✦ Generación de Discovery Run (AI Route Generation)
 
-**Status:** hardened (client v1.1 mock)  
+**Status:** hardened (client v1.2 — Mapbox Directions optional)  
 **Golden Path:** ✦ Generate Discovery Run  
 **Depends on:** SPEC-001  
 **Blocks:** SPEC-003, SPEC-005 (audio cache), SPEC-006 (photo ranking)
@@ -12,7 +12,13 @@
 - Fitting de distancia ±8% con spurs métricos + filtro de places cercanos al start.
 - Caché AsyncStorage con TTL 7 días e invalidación por versión de catálogo.
 - UX generación: checklist de fases (caché → lugares → ✦ → ruta → validar) + meta de error %.
-- TODO: `EXPO_PUBLIC_MAPBOX_TOKEN` para Directions real (misma interfaz `RouteRouter`).
+
+### Hardening notes (v1.2)
+
+- `MapboxSafeRouter` (profile `walking`) detrás de `getRouteRouter()` cuando hay `EXPO_PUBLIC_MAPBOX_TOKEN`.
+- Fallback automático a `MockSafeRouter` si Mapbox falla (red / token / quota).
+- `generateDiscoveryRoute` es async; tests pinnean el mock router.
+- Ver `.env.example`.
 
 ---
 

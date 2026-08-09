@@ -59,7 +59,7 @@ export function GeneratingRouteScreen({ intent, onReady, onCancel }: Props) {
         setDoneMeta(
           p.fromCache
             ? `Desde caché · ${formatDistanceKm(p.route.distanceM)} · ${p.route.storyPoints.length} lugares`
-            : `${formatDistanceKm(p.route.distanceM)} · error ${errPct}% · ${p.route.storyPoints.length} lugares`,
+            : `${formatDistanceKm(p.route.distanceM)} · error ${errPct}% · ${p.route.storyPoints.length} lugares · ${p.route.provider.router}`,
         );
         setBusy(false);
         setTimeout(() => {

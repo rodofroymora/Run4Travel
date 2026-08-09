@@ -12,9 +12,8 @@ import type {
  * - Inserts gentle bends between catalog points (no new POIs)
  * - Adds meter-targeted out-and-back spurs to hit ±8% of target
  *
- * Real Mapbox Directions would replace this class; same interface.
- *
- * TODO(env): set EXPO_PUBLIC_MAPBOX_TOKEN to swap in Mapbox Directions.
+ * With EXPO_PUBLIC_MAPBOX_TOKEN, getRouteRouter() prefers MapboxSafeRouter
+ * and falls back here on network/API errors.
  */
 export class MockSafeRouter implements RouteRouter {
   readonly provider = 'mock-osrm-safe';

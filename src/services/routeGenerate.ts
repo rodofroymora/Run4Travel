@@ -11,6 +11,7 @@ import type { DiscoveryRoute } from '../types/discovery';
 import type { RouteIntent } from '../types/routeIntent';
 import { track } from './analytics';
 import { clearExpiredRoutes, getCachedRoute, saveRoute } from './routeCache';
+import { getMapboxToken } from './routing';
 
 export type GenerateProgress =
   | { phase: 'cache'; message: string; step: number; total: number }
@@ -87,7 +88,9 @@ export async function generateRoute(
 
   onProgress?.({
     phase: 'route',
-    message: 'Trazando una ruta segura…',
+    message: getMapboxToken()
+      ? 'Trazando ruta segura con Mapbox…'
+      : 'Trazando una ruta segura…',
     step: 4,
     total: TOTAL_STEPS,
   });
@@ -102,7 +105,7 @@ export async function generateRoute(
   await sleep(250);
 
   try {
-    const route = generateDiscoveryRoute(intent);
+    const route = await generateDiscoveryRoute(intent);
     const catalog = getPlacesForCity(intent.cityId, intent.start);
     assertNoInventedGeometry(route, catalog);
     assertRouterOwnedGeometry(route);
@@ -127,6 +130,7 @@ export async function generateRoute(
       stories: route.storyPoints.length,
       photos: route.photoSpots.length,
       fallback: route.usedFallback ? 1 : 0,
+      router: route.provider.router,
     });
     if (route.usedFallback) track('route_fallback_used', { reason: 'llm_error' });
 

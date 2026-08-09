@@ -1,5 +1,6 @@
 import { PLACE_CATALOG_VERSION, blurbForPlace, getPlacesForCity } from '../data/places';
-import { mockSafeRouter } from '../services/routing/mockSafeRouter';
+import { getMapboxToken, getRouteRouter, mockSafeRouter } from '../services/routing';
+import type { RouteRouter } from '../services/routing';
 import type { DiscoveryRoute, Place, PhotoSpot, StoryPoint } from '../types/discovery';
 import type { RouteIntent, RouteStyle } from '../types/routeIntent';
 import { haversineM, lineDistanceM } from './geo';
@@ -10,9 +11,10 @@ export const DISTANCE_TOLERANCE_IDEAL = 0.05; // ±5%
 export function cacheKeyForIntent(
   intent: RouteIntent,
   catalogVersion = PLACE_CATALOG_VERSION,
+  routerId = getMapboxToken() ? 'mapbox-walking' : 'mock-osrm-safe',
 ): string {
   const geohash5 = `${intent.start.lat.toFixed(2)}_${intent.start.lng.toFixed(2)}`;
-  return `${intent.cityId}+${intent.style}+${intent.distanceKm}+${geohash5}+${catalogVersion}`;
+  return `${intent.cityId}+${intent.style}+${intent.distanceKm}+${geohash5}+${catalogVersion}+${routerId}`;
 }
 
 export function distanceErrorPct(actualM: number, targetKm: number): number {
@@ -85,7 +87,7 @@ export function mockLlmSelectPlaces(
   }
 }
 
-/** @deprecated use mockSafeRouter — kept for tests that import polyline builder */
+/** Sync polyline helper for unit tests (always mock router). */
 export function buildRouterPolyline(
   start: { lat: number; lng: number },
   waypoints: Place[],
@@ -168,7 +170,10 @@ export function filterPlacesNearStart(
     .slice(0, Math.min(10, places.length));
 }
 
-export function generateDiscoveryRoute(intent: RouteIntent): DiscoveryRoute {
+export async function generateDiscoveryRoute(
+  intent: RouteIntent,
+  router: RouteRouter = getRouteRouter(),
+): Promise<DiscoveryRoute> {
   const allPlaces = getPlacesForCity(intent.cityId, intent.start);
   const targetM = intent.distanceKm * 1000;
   const places = filterPlacesNearStart(allPlaces, intent.start, targetM);
@@ -196,12 +201,14 @@ export function generateDiscoveryRoute(intent: RouteIntent): DiscoveryRoute {
 
     if (selected.length < 2) continue;
 
-    const directions = mockSafeRouter.buildDirections({
-      start: intent.start,
-      waypoints: selected.map((p) => ({ lat: p.lat, lng: p.lng })),
-      targetDistanceM: targetM,
-      preferSafe: true,
-    });
+    const directions = await Promise.resolve(
+      router.buildDirections({
+        start: intent.start,
+        waypoints: selected.map((p) => ({ lat: p.lat, lng: p.lng })),
+        targetDistanceM: targetM,
+        preferSafe: true,
+      }),
+    );
 
     const err = distanceErrorPct(directions.distanceM, intent.distanceKm);
     if (!best || err < best.err) {

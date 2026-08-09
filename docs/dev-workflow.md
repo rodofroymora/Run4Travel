@@ -26,7 +26,8 @@ Golden Path cliente mock v1 base: `cursor/golden-path-client-v1` / commit en `ma
 | Rama sugerida | Enfoque | Specs |
 |---------------|---------|-------|
 | `cursor/gp-route-preview` | Preview UI + offline pack gate (mock map) | 003 ✅ |
-| `cursor/gp-route` | Router pluggable + distancia/caché/UX | 002 ✅ (Mapbox real pendiente de token) |
+| `cursor/gp-route` | Router pluggable + distancia/caché/UX | 002 ✅ |
+| `cursor/gp-route-mapbox` | Mapbox Directions + fallback mock | 002 (en curso) |
 | `cursor/gp-run` | Live metrics/charts + GPS sim + offline run | 004–007 (en curso / hardened) |
 | `cursor/gp-album-share` | Editor álbum + export stub UX | 008 + 009 ✅ |
 | `cursor/gp-strava` | OAuth mock + outbox Strava | 010 ✅ |
