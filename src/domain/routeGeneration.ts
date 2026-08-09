@@ -11,7 +11,7 @@ export const DISTANCE_TOLERANCE_IDEAL = 0.05; // ±5%
 export function cacheKeyForIntent(
   intent: RouteIntent,
   catalogVersion = PLACE_CATALOG_VERSION,
-  routerId = getMapboxToken() ? 'mapbox-walking' : 'mock-osrm-safe',
+  routerId = getMapboxToken() ? 'mapbox-walking-v2' : 'mock-osrm-safe',
 ): string {
   const geohash5 = `${intent.start.lat.toFixed(2)}_${intent.start.lng.toFixed(2)}`;
   return `${intent.cityId}+${intent.style}+${intent.distanceKm}+${geohash5}+${catalogVersion}+${routerId}`;
@@ -147,12 +147,37 @@ function routeNameFor(intent: RouteIntent, firstPlaces: Place[]): string {
   return `${lead} Discovery`;
 }
 
-function waypointBudget(distanceKm: number, catalogSize: number): number[] {
-  const base =
-    distanceKm <= 5 ? 4 : distanceKm <= 10 ? 7 : distanceKm <= 15 ? 9 : distanceKm <= 21 ? 11 : 12;
-  // Try a few counts around the base to hit distance tolerance
-  const candidates = [base, base + 1, base - 1, base + 2, Math.max(3, base - 2)];
-  return [...new Set(candidates.map((n) => Math.min(catalogSize, Math.max(3, n))))];
+function waypointBudget(
+  distanceKm: number,
+  catalogSize: number,
+  forMapbox = false,
+): number[] {
+  const base = forMapbox
+    ? distanceKm <= 5
+      ? 3
+      : distanceKm <= 10
+        ? 5
+        : distanceKm <= 15
+          ? 7
+          : distanceKm <= 21
+            ? 9
+            : 10
+    : distanceKm <= 5
+      ? 4
+      : distanceKm <= 10
+        ? 7
+        : distanceKm <= 15
+          ? 9
+          : distanceKm <= 21
+            ? 11
+            : 12;
+
+  const candidates = forMapbox
+    ? [base, base - 1, base + 1, base - 2, base + 2, Math.max(2, base - 3), base + 3]
+    : [base, base + 1, base - 1, base + 2, Math.max(3, base - 2)];
+
+  const minN = forMapbox ? 2 : 3;
+  return [...new Set(candidates.map((n) => Math.min(catalogSize, Math.max(minN, n))))];
 }
 
 /** Keep waypoints runnable: ~40% of target as max crow-fly from start. */
@@ -177,6 +202,7 @@ export async function generateDiscoveryRoute(
   const allPlaces = getPlacesForCity(intent.cityId, intent.start);
   const targetM = intent.distanceKm * 1000;
   const places = filterPlacesNearStart(allPlaces, intent.start, targetM);
+  const forMapbox = Boolean(getMapboxToken()) || routerUsesMapbox(router);
 
   let best: {
     selected: Place[];
@@ -188,7 +214,7 @@ export async function generateDiscoveryRoute(
     err: number;
   } | null = null;
 
-  for (const maxPoints of waypointBudget(intent.distanceKm, places.length)) {
+  for (const maxPoints of waypointBudget(intent.distanceKm, places.length, forMapbox)) {
     const { placeIds, blurbs, usedFallback } = mockLlmSelectPlaces(
       places,
       intent.style,
@@ -230,6 +256,17 @@ export async function generateDiscoveryRoute(
     throw new Error('No hay suficientes lugares seguros en el catálogo');
   }
 
+  // Place-level refine: add/drop catalog places until ±8% or attempts exhausted.
+  if (best.err > DISTANCE_TOLERANCE) {
+    best = await refineDistanceWithPlaces({
+      intent,
+      places,
+      router,
+      targetM,
+      current: best,
+    });
+  }
+
   const storyPoints = best.selected.map((p) =>
     buildStoryPoint(p, best!.blurbs[p.id] ?? blurbForPlace(p)),
   );
@@ -256,6 +293,89 @@ export async function generateDiscoveryRoute(
     cacheKey: cacheKeyForIntent(intent),
     usedFallback: best.usedFallback,
   };
+}
+
+type RouteCandidate = {
+  selected: Place[];
+  blurbs: Record<string, string>;
+  usedFallback: boolean;
+  geometry: [number, number][];
+  distanceM: number;
+  provider: string;
+  err: number;
+};
+
+function routerUsesMapbox(router: RouteRouter): boolean {
+  return (router as { provider?: string }).provider === 'mapbox-walking';
+}
+
+async function refineDistanceWithPlaces(args: {
+  intent: RouteIntent;
+  places: Place[];
+  router: RouteRouter;
+  targetM: number;
+  current: RouteCandidate;
+}): Promise<RouteCandidate> {
+  const { intent, places, router, targetM } = args;
+  let best = args.current;
+  const ranked = heuristicRankPlaceIds(places, intent.style, places.length);
+  const selectedIds = () => new Set(best.selected.map((p) => p.id));
+  const byId = new Map(places.map((p) => [p.id, p]));
+
+  for (let i = 0; i < 6 && best.err > DISTANCE_TOLERANCE; i++) {
+    let nextSelected: Place[] | null = null;
+
+    if (best.distanceM > targetM * 1.08 && best.selected.length > 2) {
+      // Drop farthest from start (often the long detour)
+      const sorted = [...best.selected].sort(
+        (a, b) => haversineM(intent.start, b) - haversineM(intent.start, a),
+      );
+      const dropId = sorted[0]!.id;
+      nextSelected = best.selected.filter((p) => p.id !== dropId);
+    } else if (best.distanceM < targetM * 0.92) {
+      const used = selectedIds();
+      const addId = ranked.find((id) => !used.has(id));
+      if (!addId) break;
+      const place = byId.get(addId);
+      if (!place) break;
+      nextSelected = [...best.selected, place];
+    } else {
+      break;
+    }
+
+    if (!nextSelected || nextSelected.length < 2) break;
+
+    const directions = await Promise.resolve(
+      router.buildDirections({
+        start: intent.start,
+        waypoints: nextSelected.map((p) => ({ lat: p.lat, lng: p.lng })),
+        targetDistanceM: targetM,
+        preferSafe: true,
+      }),
+    );
+    const err = distanceErrorPct(directions.distanceM, intent.distanceKm);
+    const blurbs = { ...best.blurbs };
+    for (const p of nextSelected) {
+      if (!blurbs[p.id]) blurbs[p.id] = blurbForPlace(p);
+    }
+
+    if (err < best.err || err <= DISTANCE_TOLERANCE) {
+      best = {
+        selected: nextSelected,
+        blurbs,
+        usedFallback: best.usedFallback,
+        geometry: directions.coordinates,
+        distanceM: directions.distanceM,
+        provider: directions.provider,
+        err,
+      };
+    } else {
+      // No improvement — stop to avoid thrashing API calls
+      break;
+    }
+  }
+
+  return best;
 }
 
 /** Contrato: ninguna coord de story/photo fuera del catálogo. */

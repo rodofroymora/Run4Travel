@@ -8,7 +8,7 @@ import type {
 
 export type { RouteDirectionsRequest, RouteDirectionsResult, RouteRouter } from './types';
 export { mockSafeRouter, MockSafeRouter } from './mockSafeRouter';
-export { MapboxSafeRouter } from './mapboxSafeRouter';
+export { MapboxSafeRouter, buildWaypointCandidates } from './mapboxSafeRouter';
 
 export function getMapboxToken(): string | undefined {
   const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN?.trim();

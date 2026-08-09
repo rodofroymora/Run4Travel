@@ -1,12 +1,9 @@
-import type {
-  LatLng,
-  RouteDirectionsRequest,
-  RouteDirectionsResult,
-  RouteRouter,
-} from './types';
+import type { LatLng, RouteDirectionsRequest, RouteDirectionsResult, RouteRouter } from './types';
 
 const MAPBOX_MAX_COORDS = 25;
 const DIRECTIONS_BASE = 'https://api.mapbox.com/directions/v5/mapbox';
+const DISTANCE_TOLERANCE = 0.08;
+const MAX_FIT_ATTEMPTS = 6;
 
 type MapboxDirectionsResponse = {
   code?: string;
@@ -20,6 +17,9 @@ type MapboxDirectionsResponse = {
 /**
  * Real Mapbox Directions (walking profile for sidewalk-safe geometry).
  * ✦ never invents coords — only catalog waypoints are sent; Mapbox returns the line.
+ *
+ * Fitting: tries waypoint prefixes (and a couple of mid drops) to land within ±8%
+ * of targetDistanceM without inventing geometry.
  */
 export class MapboxSafeRouter implements RouteRouter {
   readonly provider = 'mapbox-walking';
@@ -30,9 +30,37 @@ export class MapboxSafeRouter implements RouteRouter {
     req: RouteDirectionsRequest,
   ): Promise<RouteDirectionsResult> {
     const ordered = orderNearest(req.start, req.waypoints);
-    const points = truncateForMapbox([req.start, ...ordered, req.start]);
+    if (ordered.length === 0) {
+      return this.fetchLoop(req.start, [], req.preferSafe);
+    }
+
+    const candidates = buildWaypointCandidates(ordered);
+    let best: RouteDirectionsResult | null = null;
+    let attempts = 0;
+
+    for (const wps of candidates) {
+      if (attempts >= MAX_FIT_ATTEMPTS) break;
+      attempts += 1;
+      const result = await this.fetchLoop(req.start, wps, req.preferSafe);
+      if (!best || distanceErr(result.distanceM, req.targetDistanceM) < distanceErr(best.distanceM, req.targetDistanceM)) {
+        best = result;
+      }
+      if (withinTolerance(result.distanceM, req.targetDistanceM)) {
+        return result;
+      }
+    }
+
+    return best!;
+  }
+
+  private async fetchLoop(
+    start: LatLng,
+    waypoints: LatLng[],
+    preferSafe: boolean,
+  ): Promise<RouteDirectionsResult> {
+    const points = truncateForMapbox([start, ...waypoints, start]);
     const path = points.map((p) => `${p.lng},${p.lat}`).join(';');
-    const profile = req.preferSafe ? 'walking' : 'walking';
+    const profile = preferSafe ? 'walking' : 'walking';
 
     const url =
       `${DIRECTIONS_BASE}/${profile}/${path}` +
@@ -64,14 +92,51 @@ export class MapboxSafeRouter implements RouteRouter {
   }
 }
 
+function withinTolerance(actual: number, target: number): boolean {
+  if (target <= 0) return false;
+  return Math.abs(actual - target) / target <= DISTANCE_TOLERANCE;
+}
+
+function distanceErr(actual: number, target: number): number {
+  if (target <= 0) return 1;
+  return Math.abs(actual - target) / target;
+}
+
+/**
+ * Prefer full set, then shorter prefixes, then drop middle outliers.
+ * Keeps API calls bounded via MAX_FIT_ATTEMPTS.
+ */
+export function buildWaypointCandidates(ordered: LatLng[]): LatLng[][] {
+  const out: LatLng[][] = [];
+  const seen = new Set<string>();
+
+  const push = (wps: LatLng[]) => {
+    if (wps.length < 1) return;
+    const key = wps.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|');
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(wps);
+  };
+
+  push(ordered);
+  for (let n = ordered.length - 1; n >= 1; n--) {
+    push(ordered.slice(0, n));
+  }
+  // Drop one mid waypoint (helps when a detour inflates distance)
+  if (ordered.length >= 3) {
+    for (let i = 1; i < ordered.length - 1; i++) {
+      push(ordered.filter((_, idx) => idx !== i));
+    }
+  }
+  return out;
+}
+
 function orderNearest(start: LatLng, waypoints: LatLng[]): LatLng[] {
   const remaining = [...waypoints];
   const ordered: LatLng[] = [];
   let cur = start;
   while (remaining.length) {
-    remaining.sort(
-      (a, b) => crowFlyM(cur, a) - crowFlyM(cur, b),
-    );
+    remaining.sort((a, b) => crowFlyM(cur, a) - crowFlyM(cur, b));
     const next = remaining.shift()!;
     ordered.push(next);
     cur = next;
