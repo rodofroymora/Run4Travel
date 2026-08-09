@@ -10,7 +10,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.run4travel.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Run4Travel usa tu ubicación solo para sugerir el punto de partida de tu ruta. Nunca la publica por defecto."
+        "NSLocationWhenInUseUsageDescription": "Run4Travel usa tu ubicación para sugerir el punto de partida y registrar tu Discovery Run. Nunca la publica por defecto."
       }
     },
     "android": {
@@ -32,7 +32,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Run4Travel usa tu ubicación solo para sugerir el punto de partida de tu ruta. Nunca la publica por defecto."
+          "locationWhenInUsePermission": "Run4Travel usa tu ubicación para sugerir el punto de partida y registrar tu Discovery Run. Nunca la publica por defecto."
         }
       ]
     ]

@@ -1,6 +1,6 @@
 # SPEC-004 — Carrera activa: tracking, navegación y métricas
 
-**Status:** hardened (client v1.1 mock)  
+**Status:** hardened (client v1.2 — device GPS + demo fallback)  
 **Golden Path:** START RUN → Navigation → Continue Running → FINISH  
 **Depends on:** SPEC-003 (offline ready)  
 **Blocks:** SPEC-005, SPEC-006, SPEC-007
@@ -10,6 +10,12 @@
 - GPS mock acelerado con timestamps realistas + variación de ritmo (splits vivos).
 - Métricas live + badge offline; CTA **Finalizar**.
 - Persistencia AsyncStorage de `RunSession` en cada sample (offline-first).
+
+### Hardening notes (v1.2)
+
+- `createRunGpsStreamer`: prioriza `expo-location` en nativo; en web / sin permiso cae a mock.
+- UI muestra fuente GPS + aviso de señal débil; toggle a demo para QA.
+- No se inventa path: samples solo del dispositivo o del mock sobre geometría del router.
 
 ---
 

@@ -68,7 +68,7 @@ src/
 
 - Mapbox Directions opcional — con `EXPO_PUBLIC_MAPBOX_TOKEN` usa `MapboxSafeRouter` (walking); sin token o si falla → `MockSafeRouter`
 - Sin LLM/TTS de red — ranking heurístico + blurbs locales; audio = URI cache stub
-- GPS simulado a lo largo de la polyline (no `expo-location` en run)
+- GPS: en dispositivo usa `expo-location`; en web / sin permiso → simulación a lo largo de la polyline
 - Share / cámara / Strava OAuth = stubs (sin APIs externas)
 - Mapa estilizado SVG (no SDK de mapas)
 

@@ -22,7 +22,8 @@ import {
 } from '../domain/storyVersion';
 import { track } from '../services/analytics';
 import { duckMusic, resumeMusic } from '../services/musicDuck';
-import { createMockGpsStreamer } from '../services/mockGps';
+import { createRunGpsStreamer } from '../services/runGps';
+import type { GpsStreamer, GpsSource } from '../services/gpsTypes';
 import { saveRunSession } from '../services/runSessionStore';
 import type { DiscoveryRoute, StoryVersionKey } from '../types/discovery';
 import type { GpsSample, RunPhoto, RunSession } from '../types/run';
@@ -73,7 +74,10 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
   const promptedPhotos = useRef(new Set<string>());
   const playedStories = useRef(new Set<string>());
   const lastVersion = useRef<StoryVersionKey | null>(null);
-  const streamerRef = useRef<ReturnType<typeof createMockGpsStreamer> | null>(null);
+  const streamerRef = useRef<GpsStreamer | null>(null);
+  const [gpsSource, setGpsSource] = useState<GpsSource>('demo');
+  const [gpsHint, setGpsHint] = useState<string | null>(null);
+  const [forceDemo, setForceDemo] = useState(false);
   const startMs = useRef(Date.now());
   const pausedAccumMs = useRef(0);
   const pauseStarted = useRef<number | null>(null);
@@ -112,18 +116,52 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
   );
 
   useEffect(() => {
+    let cancelled = false;
     track('run_started', { routeId: route.id });
-    const streamer = createMockGpsStreamer(route.geometry.coordinates, {
-      paceSecPerKm: 330,
-      tickMs: 500,
-      metersPerTick: 22,
-      paceVarianceSec: 50,
-    });
-    streamerRef.current = streamer;
-    streamer.start(onSample);
-    void persist();
-    return () => streamer.stop();
-  }, [route, onSample, persist]);
+    setSamples([]);
+    setTick(0);
+
+    void (async () => {
+      const resolved = await createRunGpsStreamer({
+        coords: route.geometry.coordinates,
+        forceDemo,
+        paceSecPerKm: 330,
+      });
+      if (cancelled) {
+        resolved.streamer.stop();
+        return;
+      }
+      streamerRef.current?.stop();
+      streamerRef.current = resolved.streamer;
+      setGpsSource(resolved.source);
+      if (resolved.source === 'demo') {
+        const reason = resolved.fallbackReason ?? 'demo';
+        setGpsHint(
+          reason === 'web_uses_demo'
+            ? 'Web: GPS demo a lo largo de la ruta'
+            : reason === 'permission_denied'
+              ? 'Sin permiso de ubicación · GPS demo'
+              : reason === 'location_services_off'
+                ? 'Ubicación desactivada · GPS demo'
+                : reason === 'force_demo'
+                  ? 'GPS demo (manual)'
+                  : 'GPS demo · offline-first',
+        );
+        track('run_gps_source', { source: 'demo', reason });
+      } else {
+        setGpsHint('GPS del dispositivo');
+        track('run_gps_source', { source: 'device' });
+      }
+      resolved.streamer.start(onSample);
+      void persist();
+    })();
+
+    return () => {
+      cancelled = true;
+      streamerRef.current?.stop();
+      streamerRef.current = null;
+    };
+  }, [route, onSample, persist, forceDemo]);
 
   const userPos = samples[samples.length - 1];
   const pace = currentPaceSecPerKm(samples) || sessionRef.current.avgPaceSecPerKm || 330;
@@ -381,8 +419,24 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
                 {nextPlace ? `Hacia ${nextPlace.name}` : 'Último tramo'}
               </Text>
               <Text style={styles.navMeta}>
-                GPS demo · offline-first · {s.storyEvents.length} historias
+                {gpsHint ?? (gpsSource === 'device' ? 'GPS del dispositivo' : 'GPS demo')}
+                {' · '}
+                offline-first · {s.storyEvents.length} historias
+                {userPos?.acc != null && userPos.acc > 40
+                  ? ` · señal débil (~${Math.round(userPos.acc)} m)`
+                  : ''}
               </Text>
+              <Pressable
+                onPress={() => setForceDemo((v) => !v)}
+                accessibilityRole="button"
+                style={styles.gpsToggle}
+              >
+                <Text style={styles.gpsToggleLabel}>
+                  {forceDemo || gpsSource === 'demo'
+                    ? 'Usar GPS del dispositivo (si disponible)'
+                    : 'Cambiar a GPS demo'}
+                </Text>
+              </Pressable>
             </View>
           )}
         </ScrollView>
@@ -511,6 +565,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.secondaryText,
+  },
+  gpsToggle: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  gpsToggleLabel: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    color: colors.mediterraneanBlue,
+    textDecorationLine: 'underline',
   },
   controls: {
     flexDirection: 'row',
