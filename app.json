@@ -10,12 +10,19 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.run4travel.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Run4Travel usa tu ubicación para sugerir el punto de partida y registrar tu Discovery Run. Nunca la publica por defecto."
+        "NSLocationWhenInUseUsageDescription": "Run4Travel usa tu ubicación para sugerir el punto de partida y registrar tu Discovery Run. Nunca la publica por defecto.",
+        "NSCameraUsageDescription": "Run4Travel usa la cámara para capturar Photo Spots durante tu Discovery Run.",
+        "NSPhotoLibraryUsageDescription": "Run4Travel puede guardar o elegir fotos de tus Photo Spots."
       }
     },
     "android": {
       "package": "com.run4travel.app",
-      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#f6efe3",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -33,6 +40,13 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Run4Travel usa tu ubicación para sugerir el punto de partida y registrar tu Discovery Run. Nunca la publica por defecto."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Run4Travel puede guardar o elegir fotos de tus Photo Spots.",
+          "cameraPermission": "Run4Travel usa la cámara para capturar Photo Spots durante tu Discovery Run."
         }
       ]
     ]

@@ -10,15 +10,18 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.11",
     "expo-font": "~57.0.1",
+    "expo-image-picker": "~57.0.8",
     "expo-linear-gradient": "~57.0.1",
     "expo-location": "~57.0.8",
+    "expo-speech": "~57.0.1",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.2",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-svg": "15.15.4",
-    "react-native-web": "^0.21.2"
+    "react-native-web": "^0.21.2",
+    "react-native-webview": "13.16.1"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
@@ -29,7 +32,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "npx --yes tsx src/domain/routeIntent.test.ts && npx --yes tsx src/domain/routeGeneration.test.ts && npx --yes tsx src/domain/offlinePack.test.ts && npx --yes tsx src/domain/routePreview.test.ts && npx --yes tsx src/domain/storyVersion.test.ts && npx --yes tsx src/domain/stravaOutbox.test.ts && npx --yes tsx src/domain/photoSafety.test.ts && npx --yes tsx src/domain/runMetrics.test.ts && npx --yes tsx src/domain/runSummary.test.ts && npx --yes tsx src/domain/album.test.ts && npx --yes tsx src/domain/shareFormats.test.ts && npx --yes tsx src/services/routing/routing.test.ts && npx --yes tsx src/domain/gpsSample.test.ts",
+    "test": "npx --yes tsx src/domain/routeIntent.test.ts && npx --yes tsx src/domain/routeGeneration.test.ts && npx --yes tsx src/domain/offlinePack.test.ts && npx --yes tsx src/domain/routePreview.test.ts && npx --yes tsx src/domain/storyVersion.test.ts && npx --yes tsx src/domain/stravaOutbox.test.ts && npx --yes tsx src/domain/photoSafety.test.ts && npx --yes tsx src/domain/runMetrics.test.ts && npx --yes tsx src/domain/runSummary.test.ts && npx --yes tsx src/domain/album.test.ts && npx --yes tsx src/domain/shareFormats.test.ts && npx --yes tsx src/services/routing/routing.test.ts && npx --yes tsx src/domain/gpsSample.test.ts && npx --yes tsx src/services/mapboxMap.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "private": true

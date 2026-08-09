@@ -1,6 +1,6 @@
 # SPEC-006 — Photo Spots
 
-**Status:** hardened (client v1.1 mock)  
+**Status:** hardened (client v1.2 — camera / library)  
 **Golden Path:** 📸 Photo Spot  
 **Depends on:** SPEC-002 (spots), SPEC-004 (location)  
 **Blocks:** SPEC-008 (album inputs)
@@ -9,6 +9,11 @@
 
 - Safety gate intacto en carrera activa; captura stub → `RunSession.photos` → álbum.
 - Cámara real pendiente (sin permisos extra en demo).
+
+### Hardening notes (v1.2)
+
+- `expo-image-picker`: cámara en nativo; galería fallback / web.
+- URI real en `RunPhoto` (`camera` | `library`); permisos en `app.json`.
 
 ---
 

@@ -1,6 +1,6 @@
 # SPEC-003 — Preview de ruta, Story Points y Photo Spots
 
-**Status:** hardened (client v1.1 mock)  
+**Status:** hardened (client v1.2 — Mapbox RouteMap)  
 **Golden Path:** Preview Route + Story Points + Photo Spots  
 **Depends on:** SPEC-002  
 **Blocks:** SPEC-004 (start gate offline)
@@ -12,6 +12,11 @@
 - Carousel horizontal de Story Points + detalle (categoría, audio, texto).
 - Toggle Photo Spots con feedback en mapa.
 - Pack offline: checklist de pasos, barra de progreso, tamaño si >20MB, gate `ready === true` antes de START; cancelar simula pérdida de red (pack parcial, START bloqueado).
+
+### Hardening notes (v1.2)
+
+- `RouteMap`: Mapbox GL (WebView) con token; fallback `MockMap` sin token.
+- Misma geometría del router — el mapa solo visualiza.
 
 ---
 

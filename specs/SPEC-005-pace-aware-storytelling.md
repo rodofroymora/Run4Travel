@@ -1,6 +1,6 @@
 # SPEC-005 — Pace-aware AI Storytelling + Music ducking
 
-**Status:** hardened (client v1.1 mock)  
+**Status:** hardened (client v1.2 — on-device TTS)  
 **Golden Path:** Music → AI Story → Music resumes  
 **Depends on:** SPEC-002 (stories), SPEC-004 (pace/ETA)  
 **Blocks:** — (enriquece run)
@@ -9,6 +9,12 @@
 
 - Triggers siguen usando ritmo live / ETA; contador de adaptaciones alimenta chart del resumen.
 - TTS real sigue stub (`cache://audio/...`); ducking mock local.
+
+### Hardening notes (v1.2)
+
+- `expo-speech` reproduce la versión elegida (quick/standard/deep) on-device; funciona offline.
+- Duck → speak → resume; stop speech al pausar/finalizar.
+- Pack offline: texto ya cacheado; audio = TTS del dispositivo (sin CDN aún).
 
 ---
 

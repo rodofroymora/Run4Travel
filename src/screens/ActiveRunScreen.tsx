@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BatlloBackground } from '../components/BatlloBackground';
-import { MockMap } from '../components/MockMap';
+import { RouteMap } from '../components/RouteMap';
 import { PaceChart } from '../components/PaceChart';
 import { getPlacesForCity } from '../data/places';
 import { formatDistanceKm, formatDuration, formatPace, haversineM } from '../domain/geo';
@@ -24,6 +24,8 @@ import { track } from '../services/analytics';
 import { duckMusic, resumeMusic } from '../services/musicDuck';
 import { createRunGpsStreamer } from '../services/runGps';
 import type { GpsStreamer, GpsSource } from '../services/gpsTypes';
+import { captureRunPhoto } from '../services/runCamera';
+import { speakStory, stopStorySpeech } from '../services/storySpeech';
 import { saveRunSession } from '../services/runSessionStore';
 import type { DiscoveryRoute, StoryVersionKey } from '../types/discovery';
 import type { GpsSample, RunPhoto, RunSession } from '../types/run';
@@ -158,6 +160,7 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
 
     return () => {
       cancelled = true;
+      stopStorySpeech();
       streamerRef.current?.stop();
       streamerRef.current = null;
     };
@@ -215,10 +218,15 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
           sessionRef.current.nextStoryIndex = idx + 1;
           void persist();
           track('story_played', { storyPointId: sp.id, version });
-          setTimeout(() => {
-            void resumeMusic();
-            setBanner((b) => (b?.kind === 'story' ? null : b));
-          }, Math.min(sp.durationSec[version], 8) * 1000);
+          const spoken = sp.storyVersions[version];
+          void speakStory({
+            text: spoken,
+            locale: route.intent.locale || 'es-ES',
+            onDone: () => {
+              void resumeMusic();
+              setBanner((b) => (b?.kind === 'story' ? null : b));
+            },
+          });
         }
       }
     }
@@ -283,12 +291,14 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
       setPaused(true);
       sessionRef.current.status = 'paused';
       streamerRef.current?.pause();
+      stopStorySpeech();
       void resumeMusic();
     }
     void persist();
   };
 
   const finish = () => {
+    stopStorySpeech();
     streamerRef.current?.stop();
     const finished: RunSession = {
       ...sessionRef.current,
@@ -310,20 +320,33 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
 
   const capturePhoto = () => {
     if (!banner || banner.kind !== 'photo') return;
-    const photo: RunPhoto = {
-      id: `ph_${Date.now().toString(36)}`,
-      runId: sessionRef.current.id,
-      photoSpotId: banner.photoSpotId,
-      uri: `stub://photo/${banner.photoSpotId}.jpg`,
-      lat: userPos?.lat,
-      lng: userPos?.lng,
-      takenAt: new Date().toISOString(),
-      source: 'stub',
-    };
-    sessionRef.current.photos.push(photo);
-    void persist();
-    track('photo_spot_captured', { photoSpotId: banner.photoSpotId });
-    setBanner(null);
+    const spotId = banner.photoSpotId;
+    void (async () => {
+      const result = await captureRunPhoto();
+      if (!result.ok) {
+        if (result.reason !== 'cancelled') {
+          Alert.alert(
+            'No pudimos abrir la cámara',
+            'Revisa permisos o elige una foto de la galería más tarde.',
+          );
+        }
+        return;
+      }
+      const photo: RunPhoto = {
+        id: `ph_${Date.now().toString(36)}`,
+        runId: sessionRef.current.id,
+        photoSpotId: spotId,
+        uri: result.uri,
+        lat: userPos?.lat,
+        lng: userPos?.lng,
+        takenAt: new Date().toISOString(),
+        source: result.source,
+      };
+      sessionRef.current.photos.push(photo);
+      void persist();
+      track('photo_spot_captured', { photoSpotId: spotId, source: result.source });
+      setBanner(null);
+    })();
   };
 
   const s = sessionRef.current;
@@ -358,7 +381,7 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
             </Pressable>
           </View>
 
-          <MockMap
+          <RouteMap
             coordinates={route.geometry.coordinates}
             markers={markers}
             height={180}

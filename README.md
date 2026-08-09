@@ -67,10 +67,11 @@ src/
 ## Stubs / limitaciones intencionales (v1 mock)
 
 - Mapbox Directions opcional — con `EXPO_PUBLIC_MAPBOX_TOKEN` usa `MapboxSafeRouter` (walking); sin token o si falla → `MockSafeRouter`
-- Sin LLM/TTS de red — ranking heurístico + blurbs locales; audio = URI cache stub
+- Mapa: `RouteMap` (Mapbox GL vía WebView / static) con token; sin token → `MockMap` SVG
+- Stories: TTS on-device (`expo-speech`); ducking música sigue mock
+- Photo Spots: cámara/galería (`expo-image-picker`); safety gate intacto
 - GPS: en dispositivo usa `expo-location`; en web / sin permiso → simulación a lo largo de la polyline
-- Share / cámara / Strava OAuth = stubs (sin APIs externas)
-- Mapa estilizado SVG (no SDK de mapas)
+- Strava OAuth = stub (sin APIs externas en connect real)
 
 ### Env (ver `.env.example`)
 

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BatlloBackground } from '../components/BatlloBackground';
-import { MockMap } from '../components/MockMap';
+import { RouteMap } from '../components/RouteMap';
 import { canStartRun } from '../domain/offlinePack';
 import { formatDistanceKm, formatDuration } from '../domain/geo';
 import {
@@ -158,14 +158,14 @@ export function RoutePreviewScreen({ route, onBack, onStart }: Props) {
         </Text>
 
         <View style={styles.mapBlock}>
-          <MockMap
+          <RouteMap
             coordinates={route.geometry.coordinates}
             markers={markers}
             height={280}
             selectedMarkerId={selected?.id ?? null}
             label={`${route.storyPoints.length} historias · ${
               showPhotos ? route.photoSpots.length : 0
-            } foto spots`}
+            } foto spots · Mapbox`}
           />
         </View>
 
