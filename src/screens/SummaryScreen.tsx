@@ -15,6 +15,12 @@ import { splitsToChartBars } from '../domain/runMetrics';
 import { buildRunSummary, medalLabel } from '../domain/runSummary';
 import { track } from '../services/analytics';
 import { generateAlbumForRun, getAlbumByRunId } from '../services/albumStore';
+import { getRunSession } from '../services/runSessionStore';
+import {
+  flushStravaOutbox,
+  getStravaConnection,
+  queueStravaUpload,
+} from '../services/stravaSync';
 import type { DiscoveryRoute } from '../types/discovery';
 import type { RunSession, RunSummary } from '../types/run';
 import { colors, fonts, radii, spacing } from '../theme';
@@ -49,13 +55,25 @@ export function SummaryScreen({
       const existing = await getAlbumByRunId(session.id);
       if (existing) {
         if (!cancelled) setAlbumStatus('ready');
-        return;
+      } else {
+        try {
+          await generateAlbumForRun(session, route, true);
+          if (!cancelled) setAlbumStatus('ready');
+        } catch {
+          if (!cancelled) setAlbumStatus('failed');
+        }
       }
+
+      // SPEC-010 AC1: auto-sync opt-in al terminar
       try {
-        await generateAlbumForRun(session, route, true);
-        if (!cancelled) setAlbumStatus('ready');
+        const conn = await getStravaConnection();
+        if (conn?.autoSync && !cancelled) {
+          await queueStravaUpload(session);
+          await flushStravaOutbox(getRunSession);
+          track('strava_auto_sync_attempted', { runId: session.id });
+        }
       } catch {
-        if (!cancelled) setAlbumStatus('failed');
+        // outbox retiene el job; no bloquear el summary
       }
     })();
 

@@ -18,6 +18,7 @@
 - Upload `POST /api/v3/activities` con refresh de token; mock si no hay OAuth.
 - Scheme `run4travel://strava/callback`; secret en cliente = **solo demo** (prod → backend).
 - Sin secrets → mock intacto.
+- Summary auto-enqueue + flush cuando `autoSync` está activo (AC1).
 
 ---
 

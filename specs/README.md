@@ -17,7 +17,8 @@ Flujo de ramas y slices futuros: [docs/dev-workflow.md](../docs/dev-workflow.md)
 | [SPEC-007](./SPEC-007-run-summary.md) | Resumen post-carrera | Running Summary | No | implemented (client v1 mock) |
 | [SPEC-008](./SPEC-008-ai-travel-album.md) | ✦ AI Travel Album + editor | Album → Customize | Sí | implemented (client v1 mock) |
 | [SPEC-009](./SPEC-009-social-sharing.md) | Export / share social | Share | No | implemented (client v1 mock) |
-| [SPEC-010](./SPEC-010-strava-sync.md) | Sync actividad a Strava | Sync to Strava | No | implemented (client v1 mock) |
+| [SPEC-010](./SPEC-010-strava-sync.md) | Sync actividad a Strava | Sync to Strava | No | hardened (client v1.2 OAuth) |
+| [SPEC-011](./SPEC-011-traveler-run-clubs.md) | Traveler Run Clubs | Community | No | implemented (client MVP mock) |
 
 \*Puede usar IA en ranking/copy; la geometría y coords nunca las inventa un LLM.
 

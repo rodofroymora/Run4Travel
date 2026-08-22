@@ -117,6 +117,21 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
     [persist],
   );
 
+  // Reloj de duración: actualiza métricas aunque el GPS tarde entre samples
+  useEffect(() => {
+    if (paused) return;
+    const id = setInterval(() => {
+      sessionRef.current = {
+        ...sessionRef.current,
+        durationSec: Math.floor(
+          (Date.now() - startMs.current - pausedAccumMs.current) / 1000,
+        ),
+      };
+      setTick((t) => t + 1);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [paused]);
+
   useEffect(() => {
     let cancelled = false;
     track('run_started', { routeId: route.id });
@@ -360,7 +375,13 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.topRow}>
-            <Text style={styles.live}>{paused ? 'PAUSA' : 'EN CURSO · OFFLINE'}</Text>
+            <Text style={styles.live}>
+              {paused
+                ? 'PAUSA'
+                : gpsSource === 'device'
+                  ? 'EN CURSO · GPS'
+                  : 'EN CURSO · DEMO'}
+            </Text>
             <Pressable
               onPress={() =>
                 Alert.alert('¿Descartar carrera?', 'Se perderá el progreso demo.', [
@@ -403,15 +424,30 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
             </View>
           </View>
 
+          <View style={styles.secondaryMetrics}>
+            <Text style={styles.secondaryMetric}>
+              media {formatPace(s.avgPaceSecPerKm || pace)}
+            </Text>
+            <Text style={styles.secondaryMetric}>
+              {s.splitsKm.length} km · {s.storyEvents.length} ✦ · {s.photos.length} 📸
+            </Text>
+            {userPos?.speed != null && userPos.speed > 0 ? (
+              <Text style={styles.secondaryMetric}>
+                {(userPos.speed * 3.6).toFixed(1)} km/h
+              </Text>
+            ) : null}
+          </View>
+
           <PaceChart
             live
             title="Ritmo por tramo"
             subtitle={
               s.splitsKm.length
                 ? `${s.splitsKm.length} km completados · media ${formatPace(s.avgPaceSecPerKm)}`
-                : 'Offline-first · el gráfico crece con tu carrera'
+                : `Offline-first · crece al completar cada km · ${formatDistanceKm(s.distanceM)}`
             }
             bars={liveBars}
+            emptyLabel="Corre el primer km — las barras aparecen en vivo"
           />
 
           {banner ? (
@@ -506,6 +542,17 @@ const styles = StyleSheet.create({
   metrics: {
     flexDirection: 'row',
     gap: 8,
+  },
+  secondaryMetrics: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    paddingHorizontal: 2,
+  },
+  secondaryMetric: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.secondaryText,
   },
   metric: {
     flex: 1,

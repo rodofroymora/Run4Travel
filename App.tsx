@@ -18,6 +18,7 @@ import {
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActiveRunScreen } from './src/screens/ActiveRunScreen';
 import { AlbumScreen } from './src/screens/AlbumScreen';
+import { ClubsScreen } from './src/screens/ClubsScreen';
 import { CreateRouteScreen } from './src/screens/CreateRouteScreen';
 import { GeneratingRouteScreen } from './src/screens/GeneratingRouteScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -33,6 +34,7 @@ import { colors, type TabId } from './src/theme';
 
 type Screen =
   | 'home'
+  | 'clubs'
   | 'create'
   | 'generating'
   | 'preview'
@@ -69,8 +71,19 @@ export default function App() {
     });
   }, []);
 
-  const goHome = useCallback(() => setScreen('home'), []);
+  const goHome = useCallback(() => {
+    setTab('Hoy');
+    setScreen('home');
+  }, []);
   const goCreate = useCallback(() => setScreen('create'), []);
+
+  const onTabChange = useCallback((next: TabId) => {
+    setTab(next);
+    if (next === 'Clubs') setScreen('clubs');
+    else if (next === 'Hoy') setScreen('home');
+    // Explorar / Perfil: placeholder → home por ahora
+    else setScreen('home');
+  }, []);
 
   const onConfirmed = useCallback((next: RouteIntent) => {
     setIntent(next);
@@ -103,13 +116,21 @@ export default function App() {
         <HomeScreen
           cityName={cityName}
           activeTab={tab}
-          onTabChange={setTab}
+          onTabChange={onTabChange}
           onCreateRoute={goCreate}
           onStartRun={() => {
             if (route) setScreen('preview');
             else goCreate();
           }}
           readyRoute={route}
+        />
+      )}
+      {screen === 'clubs' && (
+        <ClubsScreen
+          cityId={intent?.cityId ?? route?.intent.cityId ?? 'barcelona'}
+          cityName={cityName}
+          activeTab={tab}
+          onTabChange={onTabChange}
         />
       )}
       {screen === 'create' && (
@@ -131,7 +152,6 @@ export default function App() {
           route={route}
           onBack={goHome}
           onStart={() => {
-            // Gate offline ya validado en RoutePreviewScreen (ready === true)
             setScreen('run');
           }}
         />
