@@ -71,14 +71,14 @@ src/
 - Stories: TTS on-device (`expo-speech`); ducking música sigue mock
 - Photo Spots: cámara/galería (`expo-image-picker`); safety gate intacto
 - GPS: en dispositivo usa `expo-location`; en web / sin permiso → simulación a lo largo de la polyline
-- Strava OAuth = stub (sin APIs externas en connect real)
+- Strava: OAuth real si hay Client ID + Secret; si no → mock. Secret en app = solo demo.
 
 ### Env (ver `.env.example`)
 
 | Variable | Uso | Estado |
 |----------|-----|--------|
 | `EXPO_PUBLIC_MAPBOX_TOKEN` | Directions walking reales | Activo si está en `.env` |
-| `EXPO_PUBLIC_STRAVA_CLIENT_ID` / `SECRET` | OAuth Strava | TODO — pantalla usa connect mock |
+| `EXPO_PUBLIC_STRAVA_CLIENT_ID` / `SECRET` | OAuth Strava | Activo con ambos; mock si faltan |
 | `EXPO_PUBLIC_LLM_API_KEY` | Rank/order remoto de place IDs | TODO — mock ✦ local |
 
 ## North Star

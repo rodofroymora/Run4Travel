@@ -10,15 +10,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BatlloBackground } from '../components/BatlloBackground';
 import { getRunSession } from '../services/runSessionStore';
-import { beginStravaOAuth, stravaEnvConfigured } from '../services/stravaAuth';
+import { beginStravaOAuth, stravaEnvConfigured, stravaOAuthReady } from '../services/stravaAuth';
 import {
-  connectStravaStub,
   disconnectStrava,
   flushStravaOutbox,
   getOutbox,
   getStravaConnection,
   outboxStatusLabel,
   queueStravaUpload,
+  saveStravaConnection,
   setMockNetworkOnline,
   setStravaAutoSync,
   stravaActivityDescription,
@@ -57,18 +57,32 @@ export function StravaScreen({ session, onBack }: Props) {
     setBusy(true);
     setOauthMsg(null);
     try {
-      const { athleteName } = await beginStravaOAuth('Marta', (p) => {
-        if (p.phase !== 'error') setOauthMsg(p.message);
-        else setOauthMsg(p.message);
+      const oauth = await beginStravaOAuth('Marta', (p) => {
+        setOauthMsg(p.message);
       });
-      const c = await connectStravaStub(athleteName);
+      const c = await saveStravaConnection({
+        athleteId: oauth.athleteId,
+        athleteName: oauth.athleteName,
+        connectedAt: new Date().toISOString(),
+        autoSync: true,
+        accessToken: oauth.accessToken,
+        refreshToken: oauth.refreshToken,
+        expiresAt: oauth.expiresAt,
+        mode: oauth.mode,
+      });
       setConn(c);
       Alert.alert(
         'Strava conectado',
-        stravaEnvConfigured()
-          ? 'Client ID detectado; token real aún TODO.'
-          : 'OAuth mock listo (sin secrets). Puedes sincronizar en demo.',
+        oauth.mode === 'oauth'
+          ? `Hola ${oauth.athleteName}. Ya puedes sincronizar actividades reales.`
+          : stravaEnvConfigured()
+            ? 'Falta EXPO_PUBLIC_STRAVA_CLIENT_SECRET para OAuth real. Conectado en demo.'
+            : 'OAuth mock listo (sin secrets). Puedes sincronizar en demo.',
       );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'No se pudo conectar';
+      setOauthMsg(msg);
+      Alert.alert('Strava', msg);
     } finally {
       setBusy(false);
       setOauthMsg(null);
@@ -103,7 +117,9 @@ export function StravaScreen({ session, onBack }: Props) {
         <View style={styles.card}>
           <Text style={styles.label}>Conexión</Text>
           <Text style={styles.value}>
-            {conn ? `Conectado · ${conn.athleteName}` : 'No conectado'}
+            {conn
+              ? `Conectado · ${conn.athleteName}${conn.mode === 'oauth' ? ' · OAuth' : ' · demo'}`
+              : 'No conectado'}
           </Text>
           {conn ? (
             <>
@@ -139,9 +155,11 @@ export function StravaScreen({ session, onBack }: Props) {
           )}
           {oauthMsg ? <Text style={styles.oauthMsg}>{oauthMsg}</Text> : null}
           <Text style={styles.envHint}>
-            {stravaEnvConfigured()
-              ? 'EXPO_PUBLIC_STRAVA_CLIENT_ID presente · OAuth real pendiente'
-              : 'Demo: sin EXPO_PUBLIC_STRAVA_CLIENT_ID (mock OK)'}
+            {stravaOAuthReady()
+              ? 'OAuth real listo (Client ID + Secret). Redirect: run4travel://strava/callback'
+              : stravaEnvConfigured()
+                ? 'Client ID presente · añade EXPO_PUBLIC_STRAVA_CLIENT_SECRET para OAuth real'
+                : 'Demo: sin EXPO_PUBLIC_STRAVA_CLIENT_ID (mock OK)'}
           </Text>
         </View>
 
@@ -208,7 +226,12 @@ export function StravaScreen({ session, onBack }: Props) {
                   'Sin red: se sincronizará cuando haya conexión.',
                 );
               } else if (result.succeeded > 0) {
-                Alert.alert('Sincronizado', 'Actividad enviada a Strava (mock).');
+                Alert.alert(
+                  'Sincronizado',
+                  conn.mode === 'oauth'
+                    ? 'Actividad enviada a Strava.'
+                    : 'Actividad enviada a Strava (mock).',
+                );
               } else {
                 Alert.alert('Pendiente', 'Revisa el estado del outbox.');
               }

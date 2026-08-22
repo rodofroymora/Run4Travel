@@ -1,6 +1,6 @@
 # SPEC-010 — Sync de actividad a Strava
 
-**Status:** hardened (client v1.1 mock)  
+**Status:** hardened (client v1.2 — real OAuth + upload)  
 **Golden Path:** Sync to Strava  
 **Depends on:** SPEC-004 / SPEC-007  
 **Blocks:** —
@@ -11,6 +11,13 @@
 - UX: conectar/desconectar, auto-sync, toggle red, outbox con labels ES, flush.
 - Env: `EXPO_PUBLIC_STRAVA_CLIENT_ID` / `SECRET` documentados; sin ellos → mock OK.
 - Upload real a Strava API sigue TODO.
+
+### Hardening notes (v1.2)
+
+- OAuth real con `expo-web-browser` + token exchange cuando hay Client ID **y** Secret.
+- Upload `POST /api/v3/activities` con refresh de token; mock si no hay OAuth.
+- Scheme `run4travel://strava/callback`; secret en cliente = **solo demo** (prod → backend).
+- Sin secrets → mock intacto.
 
 ---
 

@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "run4travel",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.run4travel.app",
@@ -36,6 +37,7 @@
     },
     "plugins": [
       "expo-font",
+      "expo-web-browser",
       [
         "expo-location",
         {
@@ -48,7 +50,8 @@
           "photosPermission": "Run4Travel puede guardar o elegir fotos de tus Photo Spots.",
           "cameraPermission": "Run4Travel usa la cámara para capturar Photo Spots durante tu Discovery Run."
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }
