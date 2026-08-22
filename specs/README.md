@@ -19,6 +19,8 @@ Flujo de ramas y slices futuros: [docs/dev-workflow.md](../docs/dev-workflow.md)
 | [SPEC-009](./SPEC-009-social-sharing.md) | Export / share social | Share | No | implemented (client v1 mock) |
 | [SPEC-010](./SPEC-010-strava-sync.md) | Sync actividad a Strava | Sync to Strava | No | hardened (client v1.2 OAuth) |
 | [SPEC-011](./SPEC-011-traveler-run-clubs.md) | Traveler Run Clubs | Community | No | implemented (client MVP mock) |
+| [SPEC-012](./SPEC-012-explore.md) | Explorar ciudades y estilos | Discover | No | implemented (client MVP) |
+| [SPEC-013](./SPEC-013-profile.md) | Perfil y stats | Profile | No | implemented (client MVP) |
 
 \*Puede usar IA en ranking/copy; la geometría y coords nunca las inventa un LLM.
 

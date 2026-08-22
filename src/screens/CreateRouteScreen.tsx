@@ -28,6 +28,7 @@ import {
   DISTANCE_KM,
   ROUTE_STYLES,
   ROUTE_STYLE_LABELS,
+  type City,
   type DistanceKm,
   type RouteIntent,
   type RouteStyle,
@@ -48,22 +49,41 @@ type Props = {
   onClose: () => void;
   onConfirmed: (intent: RouteIntent) => void;
   initialCityName?: string;
+  initialCity?: City;
+  initialStyle?: RouteStyle;
 };
 
-export function CreateRouteScreen({ onClose, onConfirmed, initialCityName }: Props) {
+export function CreateRouteScreen({
+  onClose,
+  onConfirmed,
+  initialCityName,
+  initialCity,
+  initialStyle,
+}: Props) {
   const insets = useSafeAreaInsets();
-  const [step, setStep] = useState<Step>('city');
-  const [query, setQuery] = useState(initialCityName ?? '');
+  const seededCity =
+    initialCity ??
+    (initialCityName
+      ? searchCities(initialCityName).find(
+          (c) => c.name.toLowerCase() === initialCityName.toLowerCase(),
+        )
+      : undefined);
+  const [step, setStep] = useState<Step>(seededCity?.supported ? 'start' : 'city');
+  const [query, setQuery] = useState(seededCity?.name ?? initialCityName ?? '');
   const [draft, setDraft] = useState<RouteIntentDraft>({
-    style: 'highlights',
-    locale: 'es-ES',
+    city: seededCity?.supported ? seededCity : undefined,
+    style: initialStyle ?? 'highlights',
+    locale: seededCity?.locales[0] ?? 'es-ES',
   });
   const [locating, setLocating] = useState(false);
   const [locationHint, setLocationHint] = useState<string | null>(null);
 
   useEffect(() => {
     track('route_intent_started');
-  }, []);
+    if (seededCity?.supported) {
+      track('city_selected', { cityId: seededCity.id, source: 'explore' });
+    }
+  }, [seededCity]);
 
   const cities = useMemo(() => searchCities(query), [query]);
   const suggestions = useMemo(

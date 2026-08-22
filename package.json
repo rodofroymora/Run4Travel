@@ -35,7 +35,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "npx --yes tsx src/domain/routeIntent.test.ts && npx --yes tsx src/domain/routeGeneration.test.ts && npx --yes tsx src/domain/offlinePack.test.ts && npx --yes tsx src/domain/routePreview.test.ts && npx --yes tsx src/domain/storyVersion.test.ts && npx --yes tsx src/domain/stravaOutbox.test.ts && npx --yes tsx src/domain/photoSafety.test.ts && npx --yes tsx src/domain/runMetrics.test.ts && npx --yes tsx src/domain/runSummary.test.ts && npx --yes tsx src/domain/album.test.ts && npx --yes tsx src/domain/shareFormats.test.ts && npx --yes tsx src/services/routing/routing.test.ts && npx --yes tsx src/domain/gpsSample.test.ts && npx --yes tsx src/services/mapboxMap.test.ts && npx --yes tsx src/domain/stravaOAuth.test.ts && npx --yes tsx src/domain/runClubs.test.ts",
+    "test": "npx --yes tsx src/domain/routeIntent.test.ts && npx --yes tsx src/domain/routeGeneration.test.ts && npx --yes tsx src/domain/offlinePack.test.ts && npx --yes tsx src/domain/routePreview.test.ts && npx --yes tsx src/domain/storyVersion.test.ts && npx --yes tsx src/domain/stravaOutbox.test.ts && npx --yes tsx src/domain/photoSafety.test.ts && npx --yes tsx src/domain/runMetrics.test.ts && npx --yes tsx src/domain/runSummary.test.ts && npx --yes tsx src/domain/album.test.ts && npx --yes tsx src/domain/shareFormats.test.ts && npx --yes tsx src/services/routing/routing.test.ts && npx --yes tsx src/domain/gpsSample.test.ts && npx --yes tsx src/services/mapboxMap.test.ts && npx --yes tsx src/domain/stravaOAuth.test.ts && npx --yes tsx src/domain/runClubs.test.ts && npx --yes tsx src/domain/profileStats.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "private": true

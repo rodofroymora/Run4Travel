@@ -1,7 +1,9 @@
 export { CreateRouteScreen } from './CreateRouteScreen';
 export { GeneratingRouteScreen } from './GeneratingRouteScreen';
 export { HomeScreen } from './HomeScreen';
+export { ExploreScreen } from './ExploreScreen';
 export { ClubsScreen } from './ClubsScreen';
+export { ProfileScreen } from './ProfileScreen';
 export { SummaryScreen } from './SummaryScreen';
 export { ActiveRunScreen } from './ActiveRunScreen';
 export { RoutePreviewScreen } from './RoutePreviewScreen';

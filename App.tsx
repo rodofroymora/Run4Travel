@@ -20,21 +20,25 @@ import { ActiveRunScreen } from './src/screens/ActiveRunScreen';
 import { AlbumScreen } from './src/screens/AlbumScreen';
 import { ClubsScreen } from './src/screens/ClubsScreen';
 import { CreateRouteScreen } from './src/screens/CreateRouteScreen';
+import { ExploreScreen } from './src/screens/ExploreScreen';
 import { GeneratingRouteScreen } from './src/screens/GeneratingRouteScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
 import { RoutePreviewScreen } from './src/screens/RoutePreviewScreen';
 import { ShareScreen } from './src/screens/ShareScreen';
 import { StravaScreen } from './src/screens/StravaScreen';
 import { SummaryScreen } from './src/screens/SummaryScreen';
 import { loadLastRouteIntent } from './src/services/routeIntentStorage';
 import type { DiscoveryRoute } from './src/types/discovery';
-import type { RouteIntent } from './src/types/routeIntent';
+import type { City, RouteIntent, RouteStyle } from './src/types/routeIntent';
 import type { RunSession } from './src/types/run';
 import { colors, type TabId } from './src/theme';
 
 type Screen =
   | 'home'
+  | 'explore'
   | 'clubs'
+  | 'profile'
   | 'create'
   | 'generating'
   | 'preview'
@@ -61,6 +65,10 @@ export default function App() {
   const [cityName, setCityName] = useState('Barcelona');
   const [route, setRoute] = useState<DiscoveryRoute | null>(null);
   const [session, setSession] = useState<RunSession | null>(null);
+  const [createSeed, setCreateSeed] = useState<{
+    city?: City;
+    style?: RouteStyle;
+  } | null>(null);
 
   useEffect(() => {
     loadLastRouteIntent().then((last) => {
@@ -75,19 +83,24 @@ export default function App() {
     setTab('Hoy');
     setScreen('home');
   }, []);
-  const goCreate = useCallback(() => setScreen('create'), []);
+  const goCreate = useCallback((city?: City, style?: RouteStyle) => {
+    setCreateSeed(city || style ? { city, style } : null);
+    if (city) setCityName(city.name);
+    setScreen('create');
+  }, []);
 
   const onTabChange = useCallback((next: TabId) => {
     setTab(next);
     if (next === 'Clubs') setScreen('clubs');
     else if (next === 'Hoy') setScreen('home');
-    // Explorar / Perfil: placeholder → home por ahora
-    else setScreen('home');
+    else if (next === 'Explorar') setScreen('explore');
+    else if (next === 'Perfil') setScreen('profile');
   }, []);
 
   const onConfirmed = useCallback((next: RouteIntent) => {
     setIntent(next);
     setCityName(next.cityName);
+    setCreateSeed(null);
     setScreen('generating');
   }, []);
 
@@ -117,12 +130,19 @@ export default function App() {
           cityName={cityName}
           activeTab={tab}
           onTabChange={onTabChange}
-          onCreateRoute={goCreate}
+          onCreateRoute={() => goCreate()}
           onStartRun={() => {
             if (route) setScreen('preview');
             else goCreate();
           }}
           readyRoute={route}
+        />
+      )}
+      {screen === 'explore' && (
+        <ExploreScreen
+          activeTab={tab}
+          onTabChange={onTabChange}
+          onCreateRoute={(city, style) => goCreate(city, style)}
         />
       )}
       {screen === 'clubs' && (
@@ -133,9 +153,22 @@ export default function App() {
           onTabChange={onTabChange}
         />
       )}
+      {screen === 'profile' && (
+        <ProfileScreen
+          activeTab={tab}
+          onTabChange={onTabChange}
+          onCreateRoute={() => goCreate()}
+          hasRecentSession={Boolean(session)}
+          onOpenStrava={() => {
+            if (session) setScreen('strava');
+          }}
+        />
+      )}
       {screen === 'create' && (
         <CreateRouteScreen
-          initialCityName={cityName}
+          initialCityName={createSeed?.city?.name ?? cityName}
+          initialCity={createSeed?.city}
+          initialStyle={createSeed?.style}
           onClose={goHome}
           onConfirmed={onConfirmed}
         />

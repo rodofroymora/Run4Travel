@@ -29,6 +29,18 @@ export async function getRunSession(id: string): Promise<RunSession | null> {
   return all[id] ?? null;
 }
 
+export async function listRunSessions(): Promise<RunSession[]> {
+  const all = await readAll();
+  return Object.values(all).sort((a, b) =>
+    (b.finishedAt ?? b.startedAt).localeCompare(a.finishedAt ?? a.startedAt),
+  );
+}
+
+export async function listCompletedRuns(): Promise<RunSession[]> {
+  const all = await listRunSessions();
+  return all.filter((s) => s.status === 'completed');
+}
+
 export async function getActiveRunSession(): Promise<RunSession | null> {
   const id = await AsyncStorage.getItem(ACTIVE_KEY);
   if (!id) return null;
