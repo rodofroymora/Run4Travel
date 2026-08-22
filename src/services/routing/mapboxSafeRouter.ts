@@ -66,7 +66,19 @@ export class MapboxSafeRouter implements RouteRouter {
       `${DIRECTIONS_BASE}/${profile}/${path}` +
       `?geometries=geojson&overview=full&access_token=${encodeURIComponent(this.accessToken)}`;
 
-    const res = await fetch(url);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12_000);
+    let res: Response;
+    try {
+      res = await fetch(url, { signal: controller.signal });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'network';
+      throw new Error(
+        msg.includes('abort') ? 'Mapbox Directions timeout' : `Mapbox Directions failed: ${msg}`,
+      );
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       throw new Error(

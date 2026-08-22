@@ -141,17 +141,35 @@ export function CreateRouteScreen({
         setLocationHint('Sin ubicación: elige un punto de la lista. El flujo sigue.');
         return;
       }
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+
+      // Web/desktop a menudo cuelga en getCurrentPosition — timeout + lastKnown
+      const timeoutMs = 8000;
+      const pos = await Promise.race([
+        (async () => {
+          const last = await Location.getLastKnownPositionAsync();
+          if (last) return last;
+          return Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+        })(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+      ]);
+
+      if (!pos) {
+        setLocationHint(
+          'GPS tardó demasiado. Elige un punto de la lista (en web es lo más fiable).',
+        );
+        track('location_timeout', { cityId: draft.city.id });
+        return;
+      }
+
       const raw = {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
         label: 'Estoy aquí',
       };
       const snapped = snapStartToCity(raw, draft.city);
-      const wasOutside =
-        snapped.lat !== raw.lat || snapped.lng !== raw.lng;
+      const wasOutside = snapped.lat !== raw.lat || snapped.lng !== raw.lng;
       setDraft((d) => ({ ...d, start: snapped }));
       if (wasOutside) {
         setLocationHint('Estabas fuera de la ciudad — usamos el centro como partida.');
@@ -266,6 +284,9 @@ export function CreateRouteScreen({
                   <Text style={styles.hereLabel}>Estoy aquí</Text>
                 )}
               </Pressable>
+              {locating ? (
+                <Text style={styles.hint}>Buscando GPS… máx. 8 s (en web mejor elige un POI)</Text>
+              ) : null}
               {locationHint ? <Text style={styles.hint}>{locationHint}</Text> : null}
 
               <Text style={styles.sectionLabel}>Sugerencias</Text>
