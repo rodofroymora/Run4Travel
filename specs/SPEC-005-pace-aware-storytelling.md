@@ -1,6 +1,6 @@
 # SPEC-005 — Pace-aware AI Storytelling + Music ducking
 
-**Status:** hardened (client v1.2 — on-device TTS)  
+**Status:** hardened (client v1.3 — TTS cache + audio duck)  
 **Golden Path:** Music → AI Story → Music resumes  
 **Depends on:** SPEC-002 (stories), SPEC-004 (pace/ETA)  
 **Blocks:** — (enriquece run)
@@ -15,6 +15,12 @@
 - `expo-speech` reproduce la versión elegida (quick/standard/deep) on-device; funciona offline.
 - Duck → speak → resume; stop speech al pausar/finalizar.
 - Pack offline: texto ya cacheado; audio = TTS del dispositivo (sin CDN aún).
+
+### Hardening notes (v1.3)
+
+- Caché AsyncStorage de scripts TTS (`warmStoryAudioCache`) al descargar offline pack.
+- `musicDuck` usa `expo-av` `DuckOthers` en native; best-effort en web.
+- `story_cache_hit` analytics en replay/warm.
 
 ---
 

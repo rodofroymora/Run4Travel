@@ -1,6 +1,6 @@
 # SPEC-009 — Social Sharing & exports
 
-**Status:** hardened (client v1.1 mock)  
+**Status:** hardened (client v1.2 — SVG export + native share)  
 **Golden Path:** Share to Instagram / Social  
 **Depends on:** SPEC-008 (o summary share mínimo)  
 **Blocks:** —
@@ -10,6 +10,12 @@
 - Pipeline stub compose→render→watermark con barra de progreso.
 - Preview por formato + caption ES; share/save siguen stub (sin APIs nativas).
 - TODO: render real (Skia/vista) cuando haya media.
+
+### Hardening notes (v1.2)
+
+- Render SVG client-side (`buildShareSvg`) escrito a cache / data-URI.
+- Share: `expo-sharing` + `Share` API; save: `expo-media-library` (web → download).
+- Overlay transparente sin fondo ink.
 
 ---
 

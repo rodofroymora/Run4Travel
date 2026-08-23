@@ -1,6 +1,6 @@
 # SPEC-002 — ✦ Generación de Discovery Run (AI Route Generation)
 
-**Status:** hardened (client v1.3 — Mapbox Directions + distance fit)  
+**Status:** hardened (client v1.4 — ✦ LLM rank + dynamic places)  
 **Golden Path:** ✦ Generate Discovery Run  
 **Depends on:** SPEC-001  
 **Blocks:** SPEC-003, SPEC-005 (audio cache), SPEC-006 (photo ranking)
@@ -24,6 +24,12 @@
 
 - Fitting ±8% con Mapbox: prefijos/drops en `MapboxSafeRouter` + refine add/drop de places del catálogo en `generateDiscoveryRoute`.
 - Budget de waypoints más bajo/amplio cuando hay token Mapbox (walking infla vs crow-fly).
+
+### Hardening notes (v1.4)
+
+- `EXPO_PUBLIC_LLM_API_KEY` → `fetchLlmPlaceRank` (OpenAI-compatible); parser rechaza IDs fuera del catálogo/POI.
+- Sin key → mock rank local; fallo red → heurística (`route_fallback_used`).
+- Places dinámicos vía Nominatim cuando no hay catálogo curado (SPEC-014).
 
 ---
 

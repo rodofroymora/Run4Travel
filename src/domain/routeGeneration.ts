@@ -1,4 +1,5 @@
 import { PLACE_CATALOG_VERSION, blurbForPlace, getPlacesForCity } from '../data/places';
+import { fetchLlmPlaceRank } from '../services/llmRank';
 import { getMapboxToken, getRouteRouter, mockSafeRouter } from '../services/routing';
 import type { RouteRouter } from '../services/routing';
 import type { DiscoveryRoute, Place, PhotoSpot, StoryPoint } from '../types/discovery';
@@ -63,7 +64,13 @@ export function mockLlmSelectPlaces(
   style: RouteStyle,
   maxCount: number,
   forceFallback = false,
-): { placeIds: string[]; blurbs: Record<string, string>; usedFallback: boolean } {
+): {
+  placeIds: string[];
+  blurbs: Record<string, string>;
+  usedFallback: boolean;
+  routeTitle?: string;
+  provider?: string;
+} {
   if (forceFallback) {
     const placeIds = heuristicRankPlaceIds(places, style, maxCount);
     return { placeIds, blurbs: {}, usedFallback: true };
@@ -80,11 +87,49 @@ export function mockLlmSelectPlaces(
       const p = places.find((x) => x.id === id);
       if (p) blurbs[id] = blurbForPlace(p);
     }
-    return { placeIds: ids, blurbs, usedFallback: false };
+    return { placeIds: ids, blurbs, usedFallback: false, provider: 'mock-rank-v2' };
   } catch {
     const placeIds = heuristicRankPlaceIds(places, style, maxCount);
     return { placeIds, blurbs: {}, usedFallback: true };
   }
+}
+
+/** ✦ real (API key) o mock local — solo IDs del catálogo/POI. */
+export async function selectPlacesWithLlm(args: {
+  places: Place[];
+  style: RouteStyle;
+  maxCount: number;
+  cityName: string;
+  distanceKm: number;
+  forceFallback?: boolean;
+}): Promise<{
+  placeIds: string[];
+  blurbs: Record<string, string>;
+  usedFallback: boolean;
+  routeTitle?: string;
+  provider?: string;
+}> {
+  if (args.forceFallback) {
+    return mockLlmSelectPlaces(args.places, args.style, args.maxCount, true);
+  }
+  const remote = await fetchLlmPlaceRank(args);
+  if (remote) {
+    const blurbs = { ...remote.blurbs };
+    for (const id of remote.placeIds) {
+      if (!blurbs[id]) {
+        const p = args.places.find((x) => x.id === id);
+        if (p) blurbs[id] = blurbForPlace(p);
+      }
+    }
+    return {
+      placeIds: remote.placeIds,
+      blurbs,
+      usedFallback: false,
+      routeTitle: remote.routeTitle,
+      provider: remote.provider,
+    };
+  }
+  return mockLlmSelectPlaces(args.places, args.style, args.maxCount);
 }
 
 /** Sync polyline helper for unit tests (always mock router). */
@@ -198,30 +243,27 @@ export function filterPlacesNearStart(
 export async function generateDiscoveryRoute(
   intent: RouteIntent,
   router: RouteRouter = getRouteRouter(),
+  placesOverride?: Place[],
 ): Promise<DiscoveryRoute> {
-  const allPlaces = getPlacesForCity(intent.cityId, intent.start);
+  const allPlaces = placesOverride ?? getPlacesForCity(intent.cityId, intent.start);
   const targetM = intent.distanceKm * 1000;
   const places = filterPlacesNearStart(allPlaces, intent.start, targetM);
   const forMapbox = Boolean(getMapboxToken()) || routerUsesMapbox(router);
 
-  let best: {
-    selected: Place[];
-    blurbs: Record<string, string>;
-    usedFallback: boolean;
-    geometry: [number, number][];
-    distanceM: number;
-    provider: string;
-    err: number;
-  } | null = null;
+  let best: RouteCandidate | null = null;
+  let llmProvider: string | undefined;
 
   for (const maxPoints of waypointBudget(intent.distanceKm, places.length, forMapbox)) {
-    const { placeIds, blurbs, usedFallback } = mockLlmSelectPlaces(
+    const ranked = await selectPlacesWithLlm({
       places,
-      intent.style,
-      maxPoints,
-    );
+      style: intent.style,
+      maxCount: maxPoints,
+      cityName: intent.cityName,
+      distanceKm: intent.distanceKm,
+    });
+    if (ranked.provider) llmProvider = ranked.provider;
     const byId = new Map(places.map((p) => [p.id, p]));
-    const selected = placeIds
+    const selected = ranked.placeIds
       .map((id) => byId.get(id))
       .filter((p): p is Place => Boolean(p));
 
@@ -240,12 +282,13 @@ export async function generateDiscoveryRoute(
     if (!best || err < best.err) {
       best = {
         selected,
-        blurbs,
-        usedFallback,
+        blurbs: ranked.blurbs,
+        usedFallback: ranked.usedFallback,
         geometry: directions.coordinates,
         distanceM: directions.distanceM,
         provider: directions.provider,
         err,
+        routeTitle: ranked.routeTitle,
       };
     }
     if (err <= DISTANCE_TOLERANCE_IDEAL) break;
@@ -277,7 +320,7 @@ export async function generateDiscoveryRoute(
 
   return {
     id: `route_${Date.now().toString(36)}`,
-    name: routeNameFor(intent, best.selected),
+    name: best.routeTitle?.trim() || routeNameFor(intent, best.selected),
     intent,
     geometry: { type: 'LineString', coordinates: best.geometry },
     distanceM: best.distanceM,
@@ -287,7 +330,7 @@ export async function generateDiscoveryRoute(
     photoSpots,
     provider: {
       router: best.provider,
-      llm: best.usedFallback ? undefined : 'mock-rank-v2',
+      llm: best.usedFallback ? undefined : llmProvider ?? 'mock-rank-v2',
     },
     createdAt: new Date().toISOString(),
     cacheKey: cacheKeyForIntent(intent),
@@ -303,6 +346,7 @@ type RouteCandidate = {
   distanceM: number;
   provider: string;
   err: number;
+  routeTitle?: string;
 };
 
 function routerUsesMapbox(router: RouteRouter): boolean {

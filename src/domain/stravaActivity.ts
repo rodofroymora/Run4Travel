@@ -33,3 +33,45 @@ export function buildStravaActivityPayload(session: RunSession): {
     distance: Math.round(session.distanceM),
   };
 }
+
+/** Build GPX 1.1 from GPS samples for Strava upload (real track). */
+export function buildRunGpx(session: RunSession): string {
+  const name = stravaActivityName(session);
+  const desc = stravaActivityDescription(session);
+  const samples =
+    session.samples.length > 0
+      ? session.samples
+      : [
+          {
+            t: Date.parse(session.startedAt) || Date.now(),
+            lat: 0,
+            lng: 0,
+          },
+        ];
+
+  const trkpts = samples
+    .map((s) => {
+      const iso = new Date(s.t).toISOString();
+      const elev = s.alt != null ? `<ele>${s.alt}</ele>` : '';
+      return `<trkpt lat="${s.lat}" lon="${s.lng}">${elev}<time>${iso}</time></trkpt>`;
+    })
+    .join('');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Run4Travel" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata><name>${escapeXml(name)}</name><desc>${escapeXml(desc)}</desc></metadata>
+  <trk>
+    <name>${escapeXml(name)}</name>
+    <type>running</type>
+    <trkseg>${trkpts}</trkseg>
+  </trk>
+</gpx>`;
+}
+
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}

@@ -68,10 +68,13 @@ src/
 
 - Mapbox Directions opcional — con `EXPO_PUBLIC_MAPBOX_TOKEN` usa `MapboxSafeRouter` (walking); sin token o si falla → `MockSafeRouter`
 - Mapa: `RouteMap` (Mapbox GL vía WebView / static) con token; sin token → `MockMap` SVG
-- Stories: TTS on-device (`expo-speech`); ducking música sigue mock
+- Stories: TTS on-device (`expo-speech`) + caché de scripts; ducking vía `expo-av`
 - Photo Spots: cámara/galería (`expo-image-picker`); safety gate intacto
 - GPS: en dispositivo usa `expo-location`; en web / sin permiso → simulación a lo largo de la polyline
-- Strava: OAuth real si hay Client ID + Secret; si no → mock. Secret en app = solo demo.
+- Strava: OAuth real + upload GPX si hay Client ID + Secret; si no → mock. Secret en app = solo demo.
+- ✦ Rank: `EXPO_PUBLIC_LLM_API_KEY` → rank/order real; sin key → mock local. Geometría siempre del router.
+- Ciudades dinámicas (SPEC-014): geocode Nominatim/Mapbox + POIs; catálogo curado cuando existe.
+- Share: SVG client-side + share sheet / media library (no Skia bitmap aún).
 
 ### Env (ver `.env.example`)
 
@@ -79,7 +82,8 @@ src/
 |----------|-----|--------|
 | `EXPO_PUBLIC_MAPBOX_TOKEN` | Directions walking reales | Activo si está en `.env` |
 | `EXPO_PUBLIC_STRAVA_CLIENT_ID` / `SECRET` | OAuth Strava | Activo con ambos; mock si faltan |
-| `EXPO_PUBLIC_LLM_API_KEY` | Rank/order remoto de place IDs | TODO — mock ✦ local |
+| `EXPO_PUBLIC_LLM_API_KEY` | Rank/order remoto de place IDs | Activo si está; mock ✦ si falta |
+| `EXPO_PUBLIC_LLM_BASE_URL` / `MODEL` | Override OpenAI-compatible | Opcional |
 
 ## North Star
 

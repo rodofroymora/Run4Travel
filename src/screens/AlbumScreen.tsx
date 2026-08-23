@@ -15,12 +15,16 @@ import {
   hideAlbumCard,
   reorderAlbumCards,
   restoreHiddenCards,
+  setAlbumTheme,
+  setCoverFromCard,
+  setPhotoCrop,
   visibleCards,
 } from '../domain/album';
 import { formatDistanceKm, formatDuration, formatPace } from '../domain/geo';
 import { track } from '../services/analytics';
 import { getAlbumByRunId, saveAlbum } from '../services/albumStore';
 import type { TravelAlbum } from '../types/album';
+import { ALBUM_ACCENTS, ALBUM_LAYOUTS } from '../types/album';
 import { colors, fonts, radii, spacing } from '../theme';
 
 type Props = {
@@ -104,20 +108,78 @@ export function AlbumScreen({ runId, onBack, onShare }: Props) {
           </Pressable>
         ) : null}
 
+        <View style={styles.themeRow}>
+          <Text style={styles.themeLabel}>Layout</Text>
+          {ALBUM_LAYOUTS.map((l) => (
+            <Pressable
+              key={l.id}
+              style={[styles.themeChip, album.theme.layout === l.id && styles.themeChipOn]}
+              onPress={() => {
+                void apply(setAlbumTheme(album, { layout: l.id }));
+                track('album_edit', { action: 'layout', layout: l.id });
+              }}
+            >
+              <Text
+                style={[
+                  styles.themeChipLabel,
+                  album.theme.layout === l.id && styles.themeChipLabelOn,
+                ]}
+              >
+                {l.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.themeRow}>
+          <Text style={styles.themeLabel}>Color</Text>
+          {ALBUM_ACCENTS.map((a) => (
+            <Pressable
+              key={a.id}
+              style={[
+                styles.swatch,
+                { backgroundColor: a.color },
+                album.theme.accent === a.color && styles.swatchOn,
+              ]}
+              onPress={() => {
+                void apply(setAlbumTheme(album, { accent: a.color }));
+                track('album_edit', { action: 'accent', accent: a.id });
+              }}
+            />
+          ))}
+        </View>
+
         {cards.map((card, index) => {
           const fullIndex = album.cards.findIndex((c) => c.id === card.id);
+          const accent = album.theme.accent;
+          const radius =
+            album.theme.layout === 'minimal'
+              ? 12
+              : album.theme.layout === 'mosaic'
+                ? 8
+                : 28;
           return (
-            <View key={card.id} style={styles.card}>
+            <View
+              key={card.id}
+              style={[
+                styles.card,
+                {
+                  backgroundColor: album.theme.bg,
+                  borderRadius: radius,
+                  borderLeftWidth: 3,
+                  borderLeftColor: accent,
+                },
+              ]}
+            >
               {card.type === 'cover' && (
                 <>
-                  <Text style={styles.cardType}>PORTADA</Text>
+                  <Text style={[styles.cardType, { color: accent }]}>PORTADA</Text>
                   <Text style={styles.cardTitle}>{card.title}</Text>
                   {card.subtitle ? <Text style={styles.cardBody}>{card.subtitle}</Text> : null}
                 </>
               )}
               {card.type === 'city_distance' && (
                 <>
-                  <Text style={styles.cardType}>CIUDAD</Text>
+                  <Text style={[styles.cardType, { color: accent }]}>CIUDAD</Text>
                   <Text style={styles.cardTitle}>
                     {card.city} · {card.distanceLabel}
                   </Text>
@@ -125,17 +187,28 @@ export function AlbumScreen({ runId, onBack, onShare }: Props) {
               )}
               {card.type === 'route_map' && (
                 <>
-                  <Text style={styles.cardType}>MAPA</Text>
+                  <Text style={[styles.cardType, { color: accent }]}>MAPA</Text>
                   <View style={styles.mapStub}>
-                    <View style={styles.mapLine} />
+                    <View style={[styles.mapLine, { backgroundColor: accent }]} />
                     <Text style={styles.cardBody}>Polyline de tu Discovery Run</Text>
                   </View>
                 </>
               )}
               {card.type === 'photo_story' && (
                 <>
-                  <Text style={styles.cardType}>FOTO · HISTORIA</Text>
-                  <View style={styles.photoStub}>
+                  <Text style={[styles.cardType, { color: accent }]}>FOTO · HISTORIA</Text>
+                  <View
+                    style={[
+                      styles.photoStub,
+                      {
+                        transform: [
+                          { scale: card.crop?.zoom ?? 1 },
+                          { translateX: (card.crop?.offsetX ?? 0) * 24 },
+                          { translateY: (card.crop?.offsetY ?? 0) * 16 },
+                        ],
+                      },
+                    ]}
+                  >
                     <Text style={styles.photoStubLabel}>
                       {card.photoId ? 'Foto capturada' : 'Sin foto · tip editorial'}
                     </Text>
@@ -165,11 +238,50 @@ export function AlbumScreen({ runId, onBack, onShare }: Props) {
                       <Text style={styles.editHint}>Toca para editar</Text>
                     </Pressable>
                   )}
+                  <View style={styles.cropRow}>
+                    <Pressable
+                      onPress={() => {
+                        const z = (card.crop?.zoom ?? 1) >= 1.4 ? 1 : 1.45;
+                        void apply(
+                          setPhotoCrop(album, card.id, {
+                            zoom: z,
+                            offsetX: card.crop?.offsetX ?? 0,
+                            offsetY: card.crop?.offsetY ?? 0,
+                          }),
+                        );
+                        track('album_edit', { action: 'crop_zoom' });
+                      }}
+                    >
+                      <Text style={styles.action}>Zoom</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        void apply(
+                          setPhotoCrop(album, card.id, {
+                            zoom: card.crop?.zoom ?? 1,
+                            offsetX: ((card.crop?.offsetX ?? 0) + 0.15) % 0.45,
+                            offsetY: card.crop?.offsetY ?? 0,
+                          }),
+                        );
+                        track('album_edit', { action: 'crop_pan' });
+                      }}
+                    >
+                      <Text style={styles.action}>Reposition</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        void apply(setCoverFromCard(album, card.id));
+                        track('album_edit', { action: 'set_cover' });
+                      }}
+                    >
+                      <Text style={styles.action}>Portada</Text>
+                    </Pressable>
+                  </View>
                 </>
               )}
               {card.type === 'stats' && (
                 <>
-                  <Text style={styles.cardType}>STATS</Text>
+                  <Text style={[styles.cardType, { color: accent }]}>STATS</Text>
                   <Text style={styles.cardTitle}>
                     {formatDistanceKm(card.distanceM)} · {formatDuration(card.durationSec)}
                   </Text>
@@ -180,7 +292,7 @@ export function AlbumScreen({ runId, onBack, onShare }: Props) {
               )}
               {card.type === 'final' && (
                 <>
-                  <Text style={styles.cardType}>CIERRE</Text>
+                  <Text style={[styles.cardType, { color: accent }]}>CIERRE</Text>
                   <Text style={styles.cardBody}>{card.caption}</Text>
                 </>
               )}
@@ -289,11 +401,57 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.terracotta,
   },
+  themeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  themeLabel: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 12,
+    color: colors.secondaryText,
+    marginRight: 4,
+  },
+  themeChip: {
+    borderWidth: 1,
+    borderColor: colors.borders,
+    backgroundColor: colors.surface,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+  },
+  themeChipOn: {
+    backgroundColor: colors.terracotta,
+    borderColor: colors.terracotta,
+  },
+  themeChipLabel: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    color: colors.ink,
+  },
+  themeChipLabelOn: { color: colors.white },
+  swatch: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  swatchOn: {
+    borderColor: colors.ink,
+  },
   card: {
     backgroundColor: colors.ink,
     padding: 18,
     marginBottom: 12,
     ...radii.cardSoft,
+  },
+  cropRow: {
+    flexDirection: 'row',
+    gap: 14,
+    marginTop: 10,
   },
   cardType: {
     fontFamily: fonts.bodySemi,

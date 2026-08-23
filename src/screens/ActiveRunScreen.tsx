@@ -25,7 +25,7 @@ import { duckMusic, resumeMusic } from '../services/musicDuck';
 import { createRunGpsStreamer } from '../services/runGps';
 import type { GpsStreamer, GpsSource } from '../services/gpsTypes';
 import { captureRunPhoto } from '../services/runCamera';
-import { speakStory, stopStorySpeech } from '../services/storySpeech';
+import { speakStory, stopStorySpeech, storyCacheKey } from '../services/storySpeech';
 import { saveRunSession } from '../services/runSessionStore';
 import type { DiscoveryRoute, StoryVersionKey } from '../types/discovery';
 import type { GpsSample, RunPhoto, RunSession } from '../types/run';
@@ -234,9 +234,11 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
           void persist();
           track('story_played', { storyPointId: sp.id, version });
           const spoken = sp.storyVersions[version];
+          const locale = route.intent.locale || 'es-ES';
           void speakStory({
             text: spoken,
-            locale: route.intent.locale || 'es-ES',
+            locale,
+            cacheKey: storyCacheKey(sp.placeId, version, locale, spoken),
             onDone: () => {
               void resumeMusic();
               setBanner((b) => (b?.kind === 'story' ? null : b));

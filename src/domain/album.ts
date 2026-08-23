@@ -167,6 +167,55 @@ export function editPhotoStoryCaption(
   };
 }
 
+export function setAlbumTheme(
+  album: TravelAlbum,
+  patch: Partial<TravelAlbum['theme']>,
+): TravelAlbum {
+  return {
+    ...album,
+    theme: { ...album.theme, ...patch },
+    createdBy: 'user',
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/** Promote a photo_story card to cover (keeps place name as title). */
+export function setCoverFromCard(album: TravelAlbum, cardId: string): TravelAlbum {
+  const source = album.cards.find((c) => c.id === cardId);
+  if (!source || source.type !== 'photo_story') return album;
+  const cards = album.cards.map((c) => {
+    if (c.type !== 'cover') return c;
+    return {
+      ...c,
+      title: source.placeName,
+      subtitle: source.storyExcerpt.slice(0, 80),
+      imageUri: source.photoId ? `photo://${source.photoId}` : c.imageUri,
+    };
+  });
+  return { ...album, cards, createdBy: 'user', updatedAt: new Date().toISOString() };
+}
+
+export function setPhotoCrop(
+  album: TravelAlbum,
+  cardId: string,
+  crop: { zoom: number; offsetX: number; offsetY: number },
+): TravelAlbum {
+  const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+  const next = {
+    zoom: clamp(crop.zoom, 1, 2.5),
+    offsetX: clamp(crop.offsetX, -0.5, 0.5),
+    offsetY: clamp(crop.offsetY, -0.5, 0.5),
+  };
+  return {
+    ...album,
+    cards: album.cards.map((c) =>
+      c.id === cardId && c.type === 'photo_story' ? { ...c, crop: next } : c,
+    ),
+    createdBy: 'user',
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export function visibleCards(album: TravelAlbum): AlbumCard[] {
   return album.cards.filter((c) => !c.hidden);
 }

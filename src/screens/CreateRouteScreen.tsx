@@ -20,7 +20,7 @@ import {
   snapStartToCity,
   type RouteIntentDraft,
 } from '../domain/routeIntent';
-import { getStartSuggestions, searchCities } from '../services/citiesApi';
+import { getStartSuggestions, getStartSuggestionsAsync, resolveCityQuery, searchCities, suggestDiscoveryCities } from '../services/citiesApi';
 import { track } from '../services/analytics';
 import { saveLastRouteIntent } from '../services/routeIntentStorage';
 import { colors, fonts, radii, spacing } from '../theme';
@@ -77,6 +77,16 @@ export function CreateRouteScreen({
   });
   const [locating, setLocating] = useState(false);
   const [locationHint, setLocationHint] = useState<string | null>(null);
+  const [resolvingCity, setResolvingCity] = useState(false);
+  const [cityHint, setCityHint] = useState<string | null>(null);
+  const [aiCities, setAiCities] = useState<string[]>([]);
+
+  const cities = useMemo(() => searchCities(query), [query]);
+  const suggestions = useMemo(
+    () => (draft.city ? getStartSuggestions(draft.city.id) : []),
+    [draft.city],
+  );
+  const [startSuggestions, setStartSuggestions] = useState<typeof suggestions>([]);
 
   useEffect(() => {
     track('route_intent_started');
@@ -85,11 +95,17 @@ export function CreateRouteScreen({
     }
   }, [seededCity]);
 
-  const cities = useMemo(() => searchCities(query), [query]);
-  const suggestions = useMemo(
-    () => (draft.city ? getStartSuggestions(draft.city.id) : []),
-    [draft.city],
-  );
+  useEffect(() => {
+    setStartSuggestions(suggestions);
+    if (!draft.city) return;
+    let cancelled = false;
+    getStartSuggestionsAsync(draft.city).then((list) => {
+      if (!cancelled && list.length) setStartSuggestions(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.city, suggestions]);
 
   const stepIndex = STEPS.indexOf(step);
   const canContinue =
@@ -97,6 +113,50 @@ export function CreateRouteScreen({
     (step === 'start' && !!draft.start) ||
     (step === 'distance' && !!draft.distanceKm) ||
     (step === 'style' && !!draft.style);
+
+  const resolveTypedCity = async () => {
+    const q = query.trim();
+    if (q.length < 2) return;
+    setResolvingCity(true);
+    setCityHint(null);
+    try {
+      const city = await resolveCityQuery(q);
+      if (!city) {
+        setCityHint('No encontramos esa ciudad. Prueba otro nombre.');
+        return;
+      }
+      setDraft((d) => ({
+        ...d,
+        city,
+        start: undefined,
+        locale: city.locales[0],
+      }));
+      setQuery(city.name);
+      setCityHint(
+        city.id.startsWith('dyn-')
+          ? `✦ Ciudad dinámica lista · ${city.country || city.name}`
+          : null,
+      );
+      track('city_selected', { cityId: city.id, source: 'geocode' });
+    } finally {
+      setResolvingCity(false);
+    }
+  };
+
+  const loadAiCities = async () => {
+    setResolvingCity(true);
+    try {
+      const { names, usedFallback } = await suggestDiscoveryCities(query);
+      setAiCities(names);
+      setCityHint(
+        usedFallback
+          ? '✦ Sugerencias locales (sin clave IA)'
+          : '✦ Ciudades sugeridas para Discovery Runs',
+      );
+    } finally {
+      setResolvingCity(false);
+    }
+  };
 
   const goNext = () => {
     if (step === 'city' && draft.city && !draft.city.supported) {
@@ -222,11 +282,62 @@ export function CreateRouteScreen({
               <TextInput
                 value={query}
                 onChangeText={setQuery}
-                placeholder="Buscar ciudad…"
+                placeholder="Buscar ciudad… (cualquier ciudad)"
                 placeholderTextColor={colors.secondaryText}
                 style={styles.search}
                 autoCorrect={false}
+                onSubmitEditing={() => void resolveTypedCity()}
               />
+              <View style={styles.cityActions}>
+                <Pressable
+                  style={[styles.cityActionBtn, resolvingCity && styles.pressed]}
+                  onPress={() => void resolveTypedCity()}
+                  disabled={resolvingCity}
+                >
+                  {resolvingCity ? (
+                    <ActivityIndicator color={colors.white} />
+                  ) : (
+                    <Text style={styles.cityActionLabel}>✦ Descubrir ciudad</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={styles.cityActionGhost}
+                  onPress={() => void loadAiCities()}
+                  disabled={resolvingCity}
+                >
+                  <Text style={styles.cityActionGhostLabel}>✦ Sugerir ciudades</Text>
+                </Pressable>
+              </View>
+              {cityHint ? <Text style={styles.hint}>{cityHint}</Text> : null}
+              {aiCities.map((name) => (
+                <Pressable
+                  key={name}
+                  onPress={() => {
+                    setQuery(name);
+                    void (async () => {
+                      setResolvingCity(true);
+                      try {
+                        const city = await resolveCityQuery(name);
+                        if (city) {
+                          setDraft((d) => ({
+                            ...d,
+                            city,
+                            start: undefined,
+                            locale: city.locales[0],
+                          }));
+                          setQuery(city.name);
+                          track('city_selected', { cityId: city.id, source: 'ai_suggest' });
+                        }
+                      } finally {
+                        setResolvingCity(false);
+                      }
+                    })();
+                  }}
+                  style={styles.cityRow}
+                >
+                  <Text style={styles.cityName}>✦ {name}</Text>
+                </Pressable>
+              ))}
               {cities.map((city) => {
                 const selected = draft.city?.id === city.id;
                 return (
@@ -245,7 +356,10 @@ export function CreateRouteScreen({
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={styles.cityName}>{city.name}</Text>
-                      <Text style={styles.cityMeta}>{city.country}</Text>
+                      <Text style={styles.cityMeta}>
+                        {city.country}
+                        {city.id.startsWith('dyn-') ? ' · dinámica' : ''}
+                      </Text>
                     </View>
                     {!city.supported ? (
                       <Text style={styles.soon}>Próximamente</Text>
@@ -290,7 +404,7 @@ export function CreateRouteScreen({
               {locationHint ? <Text style={styles.hint}>{locationHint}</Text> : null}
 
               <Text style={styles.sectionLabel}>Sugerencias</Text>
-              {suggestions.map((s) => {
+              {startSuggestions.map((s) => {
                 const selected = draft.start?.label === s.label;
                 return (
                   <Pressable
@@ -429,6 +543,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.ink,
     marginBottom: 12,
+  },
+  cityActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  cityActionBtn: {
+    backgroundColor: colors.terracotta,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    minWidth: 140,
+    alignItems: 'center',
+  },
+  cityActionLabel: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 13,
+    color: colors.white,
+  },
+  cityActionGhost: {
+    borderWidth: 1,
+    borderColor: colors.borders,
+    backgroundColor: colors.surface,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+  },
+  cityActionGhostLabel: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 13,
+    color: colors.ink,
   },
   cityRow: {
     flexDirection: 'row',

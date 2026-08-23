@@ -1,6 +1,6 @@
 # SPEC-010 — Sync de actividad a Strava
 
-**Status:** hardened (client v1.2 — real OAuth + upload)  
+**Status:** hardened (client v1.3 — OAuth + GPX upload)  
 **Golden Path:** Sync to Strava  
 **Depends on:** SPEC-004 / SPEC-007  
 **Blocks:** —
@@ -19,6 +19,12 @@
 - Scheme `run4travel://strava/callback`; secret en cliente = **solo demo** (prod → backend).
 - Sin secrets → mock intacto.
 - Summary auto-enqueue + flush cuando `autoSync` está activo (AC1).
+
+### Hardening notes (v1.3)
+
+- Prefer `POST /api/v3/uploads` con GPX del track GPS; poll status → `activity_id`.
+- Fallback a create activity si no hay samples / upload falla.
+- Idempotencia: `external_id = runId` + outbox existente.
 
 ---
 

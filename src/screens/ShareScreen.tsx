@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,7 +14,7 @@ import { SHARE_ASPECT } from '../domain/shareFormats';
 import {
   buildShareAsset,
   exportShareAsset,
-  shareOrSaveStub,
+  shareOrSaveAsset,
 } from '../services/shareExport';
 import type { ShareFormat } from '../types/share';
 import { colors, fonts, radii, spacing } from '../theme';
@@ -65,7 +66,7 @@ export function ShareScreen({ runId, routeName, cityName, onBack, onDone }: Prop
           setStatus(p.message);
         },
       );
-      const r = await shareOrSaveStub(exported, mode);
+      const r = await shareOrSaveAsset(exported, mode);
       if (r !== 'ok') {
         Alert.alert('Error', mode === 'share' ? 'No se pudo compartir' : 'No se pudo guardar');
         return;
@@ -73,8 +74,10 @@ export function ShareScreen({ runId, routeName, cityName, onBack, onDone }: Prop
       Alert.alert(
         mode === 'share' ? 'Listo' : 'Guardado',
         mode === 'share'
-          ? 'Share sheet stub: archivo listo para Instagram / sistema.'
-          : 'Stub: guardado en carrete.',
+          ? 'Share sheet abierto · SVG listo para Instagram / sistema.'
+          : Platform.OS === 'web'
+            ? 'Descarga iniciada (SVG).'
+            : 'Guardado en carrete.',
       );
       if (mode === 'share') onDone();
     } finally {
@@ -173,7 +176,7 @@ export function ShareScreen({ runId, routeName, cityName, onBack, onDone }: Prop
           <Text style={styles.secondaryLabel}>Guardar en carrete</Text>
         </Pressable>
         <Text style={styles.todo}>
-          TODO: export real (Skia/vista) cuando haya media; hoy es stub de alta fidelidad.
+          Export SVG client-side · share sheet nativo / descarga web
         </Text>
       </ScrollView>
     </BatlloBackground>

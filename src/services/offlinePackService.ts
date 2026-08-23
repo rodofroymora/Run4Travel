@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createEmptyPack, withProgress } from '../domain/offlinePack';
-import type { OfflinePackStatus } from '../types/discovery';
+import type { DiscoveryRoute, OfflinePackStatus } from '../types/discovery';
 import { track } from './analytics';
+import { storyCacheKey, warmStoryAudioCache } from './storySpeech';
 
 const KEY = '@r4t/offline_packs';
 
@@ -13,6 +14,8 @@ export type DownloadOfflinePackOptions = {
   /** Falla tras completar este paso (tests / demo de gate). */
   failAfterStep?: PackStepKey;
   onProgress?: (pack: OfflinePackStatus) => void;
+  /** When provided, warms on-device TTS cache during audio step. */
+  route?: DiscoveryRoute;
 };
 
 async function readAll(): Promise<Record<string, OfflinePackStatus>> {
@@ -60,7 +63,20 @@ export async function downloadOfflinePack(
       track('offline_pack_download_failed', { routeId, reason: 'aborted' });
       throw new Error('Descarga cancelada: sin red o interrumpida');
     }
-    await new Promise((r) => setTimeout(r, 320));
+    await new Promise((r) => setTimeout(r, 280));
+
+    if (step === 'audio' && opts.route) {
+      const locale = opts.route.intent.locale || 'es-ES';
+      const entries = opts.route.storyPoints.flatMap((sp) =>
+        (['quick', 'standard', 'deep'] as const).map((version) => ({
+          key: storyCacheKey(sp.placeId, version, locale, sp.storyVersions[version]),
+          text: sp.storyVersions[version],
+          durationSec: sp.durationSec[version],
+        })),
+      );
+      await warmStoryAudioCache(entries);
+    }
+
     if (opts.signal?.aborted) {
       track('offline_pack_download_failed', { routeId, reason: 'aborted' });
       throw new Error('Descarga cancelada: sin red o interrumpida');

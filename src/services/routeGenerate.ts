@@ -1,4 +1,4 @@
-import { getPlacesForCity } from '../data/places';
+import { PLACES_BY_CITY, getPlacesForCity as getCatalogPlaces } from '../data/places';
 import {
   assertNoInventedGeometry,
   assertRouterOwnedGeometry,
@@ -7,11 +7,14 @@ import {
   generateDiscoveryRoute,
   isDistanceWithinTolerance,
 } from '../domain/routeGeneration';
-import type { DiscoveryRoute } from '../types/discovery';
+import type { DiscoveryRoute, Place } from '../types/discovery';
 import type { RouteIntent } from '../types/routeIntent';
 import { track } from './analytics';
+import { fetchDynamicPlaces, geocodeCity } from './cityGeocode';
+import { getLlmApiKey } from './llmRank';
 import { clearExpiredRoutes, getCachedRoute, saveRoute } from './routeCache';
 import { getMapboxToken } from './routing';
+import { getCityById } from './citiesApi';
 
 export type GenerateProgress =
   | { phase: 'cache'; message: string; step: number; total: number }
@@ -34,6 +37,49 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/** Catalog ∪ dynamic POIs. Coords always from catalog/geocoder — never ✦. */
+export async function resolvePlacesForIntent(intent: RouteIntent): Promise<Place[]> {
+  const catalog = getCatalogPlaces(intent.cityId, intent.start);
+  const hasCurated = Boolean(PLACES_BY_CITY[intent.cityId]?.length);
+
+  if (hasCurated && catalog.length >= 6) {
+    return catalog;
+  }
+
+  const city =
+    getCityById(intent.cityId) ??
+    (await geocodeCity(intent.cityName)) ?? {
+      id: intent.cityId,
+      name: intent.cityName,
+      country: '',
+      center: intent.start,
+      bounds: {
+        minLat: intent.start.lat - 0.08,
+        maxLat: intent.start.lat + 0.08,
+        minLng: intent.start.lng - 0.08,
+        maxLng: intent.start.lng + 0.08,
+      },
+      supported: true,
+      locales: [intent.locale],
+    };
+
+  try {
+    const dynamic = await fetchDynamicPlaces(city, 16);
+    if (dynamic.length >= 4) {
+      // Prefer dynamic real POIs; keep catalog extras for density
+      const byKey = new Map<string, Place>();
+      for (const p of [...dynamic, ...catalog]) {
+        const k = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
+        if (!byKey.has(k)) byKey.set(k, p);
+      }
+      return [...byKey.values()];
+    }
+  } catch {
+    // fall through
+  }
+  return catalog;
+}
+
 export async function generateRoute(
   intent: RouteIntent,
   onProgress?: (p: GenerateProgress) => void,
@@ -42,6 +88,7 @@ export async function generateRoute(
     cityId: intent.cityId,
     distanceKm: intent.distanceKm,
     style: intent.style,
+    llm: getLlmApiKey() ? 1 : 0,
   });
 
   await clearExpiredRoutes();
@@ -72,19 +119,22 @@ export async function generateRoute(
 
   onProgress?.({
     phase: 'places',
-    message: 'Eligiendo lugares con alma…',
+    message: '✦ Descubriendo lugares…',
     step: 2,
     total: TOTAL_STEPS,
   });
-  await sleep(450);
+  const places = await resolvePlacesForIntent(intent);
+  await sleep(200);
 
   onProgress?.({
     phase: 'rank',
-    message: '✦ Ordenando tu descubrimiento…',
+    message: getLlmApiKey()
+      ? '✦ Ordenando tu descubrimiento…'
+      : '✦ Curando lugares…',
     step: 3,
     total: TOTAL_STEPS,
   });
-  await sleep(400);
+  await sleep(200);
 
   onProgress?.({
     phase: 'route',
@@ -94,7 +144,7 @@ export async function generateRoute(
     step: 4,
     total: TOTAL_STEPS,
   });
-  await sleep(450);
+  await sleep(250);
 
   onProgress?.({
     phase: 'validate',
@@ -102,12 +152,11 @@ export async function generateRoute(
     step: 5,
     total: TOTAL_STEPS,
   });
-  await sleep(250);
+  await sleep(150);
 
   try {
-    const route = await generateDiscoveryRoute(intent);
-    const catalog = getPlacesForCity(intent.cityId, intent.start);
-    assertNoInventedGeometry(route, catalog);
+    const route = await generateDiscoveryRoute(intent, undefined, places);
+    assertNoInventedGeometry(route, places);
     assertRouterOwnedGeometry(route);
 
     const err = distanceErrorPct(route.distanceM, intent.distanceKm);
@@ -116,7 +165,6 @@ export async function generateRoute(
     track('route_photo_spot_count', { n: route.photoSpots.length });
 
     if (!isDistanceWithinTolerance(route.distanceM, intent.distanceKm)) {
-      // Soft warn for analytics; still return best effort for demo
       track('route_distance_out_of_tolerance', {
         pct: Math.round(err * 1000) / 10,
       });
@@ -131,6 +179,7 @@ export async function generateRoute(
       photos: route.photoSpots.length,
       fallback: route.usedFallback ? 1 : 0,
       router: route.provider.router,
+      llm: route.provider.llm ?? 'none',
     });
     if (route.usedFallback) track('route_fallback_used', { reason: 'llm_error' });
 

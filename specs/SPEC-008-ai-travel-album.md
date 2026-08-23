@@ -1,6 +1,6 @@
 # SPEC-008 — ✦ AI Travel Album + Editor
 
-**Status:** hardened (client v1.1 mock)  
+**Status:** hardened (client v1.2 — editor theme/cover/crop)  
 **Golden Path:** ✦ AI generates Travel Album → Preview → Customize  
 **Depends on:** SPEC-007, SPEC-006 (fotos), SPEC-004  
 **Blocks:** SPEC-009
@@ -10,6 +10,12 @@
 - Nombres de lugar desde catálogo; prioriza stories escuchadas.
 - Editor: reordenar, ocultar, restaurar ocultas, editar caption, flash de guardado.
 - Copy de cierre en español; ✦ editorial mock (sin red).
+
+### Hardening notes (v1.2)
+
+- Layouts `editorial | mosaic | minimal` + acentos de color.
+- Crop/zoom/reposition en cards `photo_story`.
+- “Portada” desde una foto/historia.
 
 ---
 

@@ -111,6 +111,7 @@ export function RoutePreviewScreen({ route, onBack, onStart }: Props) {
         current = await downloadOfflinePack(route.id, {
           signal: abortRef.current,
           onProgress: setPack,
+          route,
         });
       } catch (e) {
         track('run_start_blocked_offline', { routeId: route.id });

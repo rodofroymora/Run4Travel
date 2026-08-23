@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { buildStravaActivityPayload } from '../domain/stravaActivity';
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import { buildRunGpx, buildStravaActivityPayload } from '../domain/stravaActivity';
 import {
   enqueueIdempotent,
   jobsReadyToFlush,
@@ -16,6 +18,7 @@ import {
 } from './stravaAuth';
 
 export {
+  buildRunGpx,
   buildStravaActivityPayload,
   stravaActivityDescription,
   stravaActivityName,
@@ -137,9 +140,87 @@ async function ensureAccessToken(conn: StravaConnection): Promise<string> {
   return next.accessToken!;
 }
 
+async function waitForStravaUpload(
+  token: string,
+  uploadId: number,
+  attempts = 8,
+): Promise<string> {
+  for (let i = 0; i < attempts; i++) {
+    const res = await fetch(`https://www.strava.com/api/v3/uploads/${uploadId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Strava upload status HTTP ${res.status}: ${text.slice(0, 120)}`);
+    }
+    const data = (await res.json()) as {
+      id?: number;
+      activity_id?: number | null;
+      status?: string;
+      error?: string | null;
+    };
+    if (data.error) throw new Error(`Strava upload error: ${data.error}`);
+    if (data.activity_id) return String(data.activity_id);
+    await new Promise((r) => setTimeout(r, 700 + i * 200));
+  }
+  // Upload accepted but activity not ready yet — still treat upload id as success key
+  return `upload_${uploadId}`;
+}
+
+/** Prefer GPX upload (GPS track); fall back to manual activity create. */
 async function realUpload(session: RunSession, conn: StravaConnection): Promise<string> {
   const token = await ensureAccessToken(conn);
   const payload = buildStravaActivityPayload(session);
+
+  if (session.samples.length >= 2) {
+    const gpx = buildRunGpx(session);
+    const form = new FormData();
+    form.append('data_type', 'gpx');
+    form.append('name', payload.name);
+    form.append('description', payload.description);
+    form.append('activity_type', 'run');
+    form.append('external_id', session.id);
+    const fileName = `${session.id}.gpx`;
+    if (Platform.OS === 'web' && typeof Blob !== 'undefined') {
+      form.append('file', new Blob([gpx], { type: 'application/gpx+xml' }), fileName);
+    } else {
+      const base = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+      if (base) {
+        const uri = `${base}${fileName}`;
+        await FileSystem.writeAsStringAsync(uri, gpx, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        form.append('file', {
+          uri,
+          name: fileName,
+          type: 'application/gpx+xml',
+        } as unknown as Blob);
+      } else {
+        form.append('file', new Blob([gpx], { type: 'application/gpx+xml' }), fileName);
+      }
+    }
+
+    const up = await fetch('https://www.strava.com/api/v3/uploads', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+
+    if (up.status === 401 || up.status === 403) {
+      throw new Error(`Strava upload auth HTTP ${up.status}`);
+    }
+
+    if (up.ok) {
+      const data = (await up.json()) as { id?: number; activity_id?: number };
+      if (data.activity_id) return String(data.activity_id);
+      if (data.id) return waitForStravaUpload(token, data.id);
+    }
+    // Duplicate external_id often returns 409 — treat as success-ish below
+    if (up.status === 409) {
+      return `strava_dup_${session.id}`;
+    }
+  }
+
   const body = new URLSearchParams({
     name: payload.name,
     type: payload.type,
