@@ -30,6 +30,8 @@
 - `EXPO_PUBLIC_LLM_API_KEY` → `fetchLlmPlaceRank` (OpenAI-compatible); parser rechaza IDs fuera del catálogo/POI.
 - Sin key → mock rank local; fallo red → heurística (`route_fallback_used`).
 - Places dinámicos vía Nominatim cuando no hay catálogo curado (SPEC-014).
+- Tras rank, ✦ escribe `quick|standard|deep` (`fetchLlmStories`); fallback plantilla local.
+- Estilo `cafes` (SPEC-015) prioriza category cafe.
 
 ---
 

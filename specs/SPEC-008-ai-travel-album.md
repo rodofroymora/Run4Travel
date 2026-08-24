@@ -17,6 +17,10 @@
 - Crop/zoom/reposition en cards `photo_story`.
 - “Portada” desde una foto/historia.
 
+### Hardening notes (v1.3)
+
+- `fetchLlmAlbumCopy` reescribe cover/final/excerpts con IDs de lugares visitados; fallback plantilla.
+
 ---
 
 ## Problem

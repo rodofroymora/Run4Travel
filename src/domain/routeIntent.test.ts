@@ -12,6 +12,7 @@ import {
 assert.equal(isDistanceKm(10), true);
 assert.equal(isDistanceKm(7), false);
 assert.equal(isRouteStyle('architecture'), true);
+assert.equal(isRouteStyle('cafes'), true);
 assert.equal(isRouteStyle('sprint'), false);
 
 const barcelona = getCityById('barcelona');

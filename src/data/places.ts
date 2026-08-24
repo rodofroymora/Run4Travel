@@ -1,7 +1,8 @@
 import type { Place } from '../types/discovery';
+import { cafePlacesForCity } from './cafes';
 
 /** Bump when catalog coords/IDs change — invalidates route cache keys. */
-export const PLACE_CATALOG_VERSION = 'v2';
+export const PLACE_CATALOG_VERSION = 'v3';
 
 /** Catálogo curado — coords reales; ✦ solo elige IDs de aquí. */
 export const PLACES_BY_CITY: Record<string, Place[]> = {
@@ -348,7 +349,11 @@ export const PLACE_BLURBS: Record<string, string> = {
 /** Places genéricos alrededor del centro de una ciudad soportada. */
 export function getPlacesForCity(cityId: string, center: { lat: number; lng: number }): Place[] {
   const catalog = PLACES_BY_CITY[cityId];
-  if (catalog?.length) return catalog;
+  const cafes = cafePlacesForCity(cityId);
+  if (catalog?.length) {
+    const ids = new Set(catalog.map((p) => p.id));
+    return [...catalog, ...cafes.filter((c) => !ids.has(c.id))];
+  }
 
   const offsets = [
     [0.008, 0.004, 'Plaza Mayor'],
@@ -361,7 +366,7 @@ export function getPlacesForCity(cityId: string, center: { lat: number; lng: num
     [0.006, 0.008, 'Jardines'],
   ] as const;
 
-  return offsets.map(([dLat, dLng, name], i) => ({
+  const synthetic: Place[] = offsets.map(([dLat, dLng, name], i) => ({
     id: `${cityId}-p${i}`,
     name,
     lat: center.lat + dLat,
@@ -371,6 +376,7 @@ export function getPlacesForCity(cityId: string, center: { lat: number; lng: num
     safeForRunning: true,
     styles: ['highlights', 'scenic', 'historic', 'parks'],
   }));
+  return [...cafes, ...synthetic];
 }
 
 export function blurbForPlace(place: Place): string {

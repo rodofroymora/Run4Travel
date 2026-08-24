@@ -20,7 +20,7 @@ Como viajero en una ciudad, quiero elegir ciudad, punto de partida, distancia y 
 1. **Given** estoy en Hoy / “✦ Crear ruta”, **When** abro el flujo, **Then** veo selector de ciudad (lista + búsqueda).
 2. **Given** ciudad seleccionada, **When** elijo punto de partida, **Then** puedo usar ubicación actual (con permiso) o un POI / dirección en esa ciudad.
 3. **Given** punto válido, **When** elijo distancia, **Then** solo puedo elegir `5K | 10K | 15K | 21K | 42K`.
-4. **Given** distancia elegida, **When** elijo estilo, **Then** veo: Highlights · Historic · Scenic · Parks · Architecture · Hidden Gems · Waterfront (default: Highlights).
+  4. **Given** distancia elegida, **When** elijo estilo, **Then** veo: Highlights · Historic · Scenic · Parks · Architecture · Hidden Gems · Waterfront · Cafés (default: Highlights).
 5. **Given** todos los campos válidos, **When** confirmo, **Then** se dispara SPEC-002 con el payload de intención de ruta.
 6. **Given** rechazo de permiso de ubicación, **When** intento “ubicación actual”, **Then** puedo elegir punto manualmente sin bloquear el flujo.
 7. Copy cercano, sin jerga técnica; CTAs con ✦ solo en acciones IA posteriores.

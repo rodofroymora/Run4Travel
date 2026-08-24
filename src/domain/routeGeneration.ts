@@ -1,4 +1,6 @@
 import { PLACE_CATALOG_VERSION, blurbForPlace, getPlacesForCity } from '../data/places';
+import { offersForSelectedPlaces } from './partnerOffers';
+import { fetchLlmStories, type StoryDraft } from '../services/llmCopy';
 import { fetchLlmPlaceRank } from '../services/llmRank';
 import { getMapboxToken, getRouteRouter, mockSafeRouter } from '../services/routing';
 import type { RouteRouter } from '../services/routing';
@@ -47,7 +49,9 @@ export function heuristicRankPlaceIds(
           ? 0.1
           : style === 'waterfront' && p.category === 'waterfront'
             ? 0.1
-            : 0;
+            : style === 'cafes' && p.category === 'cafe'
+              ? 0.2
+              : 0;
       return { id: p.id, score: p.relevance + styleBonus + parkBonus };
     })
     .sort((a, b) => b.score - a.score);
@@ -147,23 +151,40 @@ export function buildRouterPolyline(
   return result.coordinates;
 }
 
-function buildStoryPoint(place: Place, blurb: string): StoryPoint {
+function estimateNarrationSec(text: string, cap: number): number {
+  return Math.max(8, Math.min(cap, Math.round(text.length / 14)));
+}
+
+function buildStoryPoint(
+  place: Place,
+  blurb: string,
+  draft?: StoryDraft,
+  partnerOfferId?: string,
+): StoryPoint {
   const base = blurb || blurbForPlace(place);
-  const quick = base.length > 90 ? `${base.slice(0, 87)}…` : base;
-  const standard = `${base} Observa los detalles mientras pasas.`;
-  const deep = `${base} Aquí la ciudad cuenta su historia a quien corre con atención: arquitectura, ritmo y luz.`;
+  const quick = draft?.quick ?? (base.length > 90 ? `${base.slice(0, 87)}…` : base);
+  const standard = draft?.standard ?? `${base} Observa los detalles mientras pasas.`;
+  const deep =
+    draft?.deep ??
+    `${base} Aquí la ciudad cuenta su historia a quien corre con atención: arquitectura, ritmo y luz.`;
   return {
     id: `sp-${place.id}`,
     placeId: place.id,
-    shortDescription: base,
+    placeName: place.name,
+    shortDescription: draft?.quick ?? base,
     storyVersions: { quick, standard, deep },
     audio: {
       quick: `cache://audio/${place.id}/quick`,
       standard: `cache://audio/${place.id}/standard`,
       deep: `cache://audio/${place.id}/deep`,
     },
-    durationSec: { quick: 18, standard: 42, deep: 90 },
+    durationSec: {
+      quick: estimateNarrationSec(quick, 25),
+      standard: estimateNarrationSec(standard, 55),
+      deep: estimateNarrationSec(deep, 110),
+    },
     photoSpotId: `ps-${place.id}`,
+    partnerOfferId,
   };
 }
 
@@ -173,7 +194,10 @@ function buildPhotoSpot(place: Place): PhotoSpot {
     placeId: place.id,
     lat: place.lat,
     lng: place.lng,
-    tip: `Desde la acera, enmarca ${place.name}. No te detengas en la calzada.`,
+    tip:
+      place.category === 'cafe'
+        ? `Enmarca ${place.name} desde la acera. El café espera al terminar — no cruces en rojo.`
+        : `Desde la acera, enmarca ${place.name}. No te detengas en la calzada.`,
     radiusM: 120,
   };
 }
@@ -187,6 +211,9 @@ function routeNameFor(intent: RouteIntent, firstPlaces: Place[]): string {
   }
   if (intent.style === 'historic' && intent.cityId === 'cdmx') {
     return 'Centro Histórico Loop';
+  }
+  if (intent.style === 'cafes') {
+    return `${intent.cityName} Coffee Run`;
   }
   const lead = firstPlaces[0]?.name ?? intent.cityName;
   return `${lead} Discovery`;
@@ -310,8 +337,28 @@ export async function generateDiscoveryRoute(
     });
   }
 
+  const storyDrafts =
+    (await fetchLlmStories({
+      cityName: intent.cityName,
+      style: intent.style,
+      locale: intent.locale,
+      places: best.selected,
+    })) ?? {};
+
+  const partnerOffers = offersForSelectedPlaces(
+    best.selected,
+    intent.cityId,
+    intent.style,
+  );
+  const offerByPlace = new Map(partnerOffers.map((o) => [o.placeId, o.id]));
+
   const storyPoints = best.selected.map((p) =>
-    buildStoryPoint(p, best!.blurbs[p.id] ?? blurbForPlace(p)),
+    buildStoryPoint(
+      p,
+      best!.blurbs[p.id] ?? blurbForPlace(p),
+      storyDrafts[p.id],
+      offerByPlace.get(p.id),
+    ),
   );
   const photoSpots = best.selected.map(buildPhotoSpot);
 
@@ -328,13 +375,17 @@ export async function generateDiscoveryRoute(
     estimatedMovingTimeSec,
     storyPoints,
     photoSpots,
+    places: best.selected,
+    partnerOffers,
     provider: {
       router: best.provider,
-      llm: best.usedFallback ? undefined : llmProvider ?? 'mock-rank-v2',
+      llm: best.usedFallback && !Object.keys(storyDrafts).length
+        ? undefined
+        : llmProvider ?? (Object.keys(storyDrafts).length ? 'llm-stories' : 'mock-rank-v2'),
     },
     createdAt: new Date().toISOString(),
     cacheKey: cacheKeyForIntent(intent),
-    usedFallback: best.usedFallback,
+    usedFallback: best.usedFallback && Object.keys(storyDrafts).length === 0,
   };
 }
 

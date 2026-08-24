@@ -14,6 +14,7 @@ import { BatlloBackground } from '../components/BatlloBackground';
 import { RouteMap } from '../components/RouteMap';
 import { canStartRun } from '../domain/offlinePack';
 import { formatDistanceKm, formatDuration } from '../domain/geo';
+import { maxDiscountPct } from '../domain/partnerOffers';
 import {
   buildPreviewMarkers,
   categoryLabelEs,
@@ -48,7 +49,10 @@ export function RoutePreviewScreen({ route, onBack, onStart }: Props) {
   const listRef = useRef<FlatList<StoryPoint>>(null);
 
   const places = useMemo(
-    () => getPlacesForCity(route.intent.cityId, route.intent.start),
+    () =>
+      route.places?.length
+        ? route.places
+        : getPlacesForCity(route.intent.cityId, route.intent.start),
     [route],
   );
 
@@ -58,16 +62,22 @@ export function RoutePreviewScreen({ route, onBack, onStart }: Props) {
   );
 
   const placeName = useCallback(
-    (placeId: string) => placeById(placeId)?.name ?? placeId,
-    [placeById],
+    (placeId: string) =>
+      placeById(placeId)?.name ??
+      route.storyPoints.find((s) => s.placeId === placeId)?.placeName ??
+      placeId,
+    [placeById, route.storyPoints],
   );
 
   const packMb = useMemo(() => estimateOfflinePackMb(route), [route]);
 
   useEffect(() => {
     track('route_preview_opened', { routeId: route.id });
+    if (route.partnerOffers?.length) {
+      track('partner_offer_previewed', { n: route.partnerOffers.length });
+    }
     getOfflinePack(route.id).then(setPack);
-  }, [route.id]);
+  }, [route.id, route.partnerOffers]);
 
   const markers = useMemo(
     () =>
@@ -218,6 +228,24 @@ export function RoutePreviewScreen({ route, onBack, onStart }: Props) {
           </Pressable>
         </View>
 
+        {(route.partnerOffers?.length ?? 0) > 0 ? (
+          <View style={styles.offerPanel}>
+            <Text style={styles.offerEyebrow}>CAFÉS PARTNER</Text>
+            <Text style={styles.offerTitle}>
+              Hasta −{maxDiscountPct(route.partnerOffers ?? [])}% al terminar
+            </Text>
+            <Text style={styles.offerHint}>
+              Corre seguro. Los códigos se revelan en el resumen — no pares en la calzada.
+            </Text>
+            {(route.partnerOffers ?? []).slice(0, 4).map((o) => (
+              <Text key={o.id} style={styles.offerRow}>
+                {o.venueName} · {o.perk}
+                {o.demo ? ' · demo' : ''}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
         <View style={styles.sectionRow}>
           <Text style={styles.section}>Story Points</Text>
           <Text style={styles.sectionHint}>Desliza para explorar</Text>
@@ -259,6 +287,7 @@ export function RoutePreviewScreen({ route, onBack, onStart }: Props) {
                 </Text>
                 <Text style={styles.storyDur}>
                   Audio ~{sp.durationSec.standard}s · estándar
+                  {sp.partnerOfferId ? ' · café partner' : ''}
                 </Text>
               </Pressable>
             );
@@ -396,6 +425,38 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
     ...radii.cardSoft,
+  },
+  offerPanel: {
+    backgroundColor: colors.ink,
+    padding: 16,
+    marginBottom: 18,
+    ...radii.cardSoft,
+  },
+  offerEyebrow: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    color: colors.mosaicYellow,
+    marginBottom: 6,
+  },
+  offerTitle: {
+    fontFamily: fonts.headingBold,
+    fontSize: 18,
+    color: colors.surface,
+    marginBottom: 6,
+  },
+  offerHint: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: 'rgba(255,248,239,0.7)',
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+  offerRow: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: 'rgba(255,248,239,0.88)',
+    marginBottom: 4,
   },
   cardTag: {
     fontFamily: fonts.bodySemi,

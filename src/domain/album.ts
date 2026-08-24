@@ -13,6 +13,10 @@ function placeNameFor(
   placeId: string,
   fallback: string,
 ): string {
+  const fromRoute = route.places?.find((p) => p.id === placeId)?.name;
+  if (fromRoute) return fromRoute;
+  const fromStory = route.storyPoints.find((s) => s.placeId === placeId)?.placeName;
+  if (fromStory) return fromStory;
   const places = getPlacesForCity(route.intent.cityId, route.intent.start);
   return places.find((p) => p.id === placeId)?.name ?? fallback;
 }

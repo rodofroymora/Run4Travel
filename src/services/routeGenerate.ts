@@ -1,3 +1,4 @@
+import { cafePlacesForCity } from '../data/cafes';
 import { PLACES_BY_CITY, getPlacesForCity as getCatalogPlaces } from '../data/places';
 import {
   assertNoInventedGeometry,
@@ -40,11 +41,9 @@ function sleep(ms: number): Promise<void> {
 /** Catalog ∪ dynamic POIs. Coords always from catalog/geocoder — never ✦. */
 export async function resolvePlacesForIntent(intent: RouteIntent): Promise<Place[]> {
   const catalog = getCatalogPlaces(intent.cityId, intent.start);
+  const partners = cafePlacesForCity(intent.cityId);
   const hasCurated = Boolean(PLACES_BY_CITY[intent.cityId]?.length);
-
-  if (hasCurated && catalog.length >= 6) {
-    return catalog;
-  }
+  const wantCafes = intent.style === 'cafes';
 
   const city =
     getCityById(intent.cityId) ??
@@ -63,19 +62,41 @@ export async function resolvePlacesForIntent(intent: RouteIntent): Promise<Place
       locales: [intent.locale],
     };
 
-  try {
-    const dynamic = await fetchDynamicPlaces(city, 16);
-    if (dynamic.length >= 4) {
-      // Prefer dynamic real POIs; keep catalog extras for density
-      const byKey = new Map<string, Place>();
-      for (const p of [...dynamic, ...catalog]) {
+  const merge = (lists: Place[][]): Place[] => {
+    const byKey = new Map<string, Place>();
+    for (const list of lists) {
+      for (const p of list) {
         const k = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
         if (!byKey.has(k)) byKey.set(k, p);
       }
-      return [...byKey.values()];
     }
+    return [...byKey.values()];
+  };
+
+  let dynamic: Place[] = [];
+  try {
+    dynamic = await fetchDynamicPlaces(city, wantCafes ? 18 : 16, {
+      cafes: wantCafes,
+    });
   } catch {
-    // fall through
+    dynamic = [];
+  }
+
+  if (wantCafes) {
+    const cafes = merge([partners, dynamic.filter((p) => p.category === 'cafe'), catalog.filter((p) => p.category === 'cafe')]);
+    if (cafes.length >= 3) {
+      track('cafe_route_generated', { cityId: intent.cityId, n: cafes.length });
+      return cafes;
+    }
+    return merge([cafes, catalog]).slice(0, 14);
+  }
+
+  if (hasCurated && catalog.length >= 6) {
+    return catalog;
+  }
+
+  if (dynamic.length >= 4) {
+    return merge([dynamic, catalog]);
   }
   return catalog;
 }

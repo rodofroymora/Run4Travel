@@ -41,6 +41,7 @@ export type RunSession = {
   photos: RunPhoto[];
   narrationAdaptations: number;
   nextStoryIndex: number;
+  unlockedOfferIds?: string[];
 };
 
 export type RunSummary = {

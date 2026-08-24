@@ -7,6 +7,7 @@ import { PaceChart } from '../components/PaceChart';
 import { getPlacesForCity } from '../data/places';
 import { formatDistanceKm, formatDuration, formatPace, haversineM } from '../domain/geo';
 import { evaluatePhotoSafety } from '../domain/photoSafety';
+import { unlockOffers } from '../domain/partnerOffers';
 import {
   computeAvgPaceSecPerKm,
   computePartialSplit,
@@ -45,7 +46,10 @@ type Banner =
 export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
   const insets = useSafeAreaInsets();
   const places = useMemo(
-    () => getPlacesForCity(route.intent.cityId, route.intent.start),
+    () =>
+      route.places?.length
+        ? route.places
+        : getPlacesForCity(route.intent.cityId, route.intent.start),
     [route],
   );
 
@@ -67,6 +71,7 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
     photos: [],
     narrationAdaptations: 0,
     nextStoryIndex: 0,
+    unlockedOfferIds: [],
   });
 
   const [samples, setSamples] = useState<GpsSample[]>([]);
@@ -221,7 +226,9 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
           void duckMusic();
           setBanner({
             kind: 'story',
-            text: `✦ Te acercas a ${place.name}`,
+            text: sp.partnerOfferId
+              ? `✦ ${place.name} · café partner cerca`
+              : `✦ Te acercas a ${place.name}`,
             version,
             storyPointId: sp.id,
           });
@@ -317,6 +324,16 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
   const finish = () => {
     stopStorySpeech();
     streamerRef.current?.stop();
+    const heard = sessionRef.current.storyEvents.map((e) => e.storyPointId);
+    const unlocked = unlockOffers({
+      offers: route.partnerOffers ?? [],
+      storyPoints: route.storyPoints,
+      heardStoryPointIds: heard,
+      cafeRoute: route.intent.style === 'cafes',
+    });
+    for (const o of unlocked) {
+      track('partner_offer_unlocked', { offerId: o.id, demo: o.demo ? 1 : 0 });
+    }
     const finished: RunSession = {
       ...sessionRef.current,
       status: 'completed',
@@ -324,6 +341,7 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
       durationSec: Math.floor(
         (Date.now() - startMs.current - pausedAccumMs.current) / 1000,
       ),
+      unlockedOfferIds: unlocked.map((o) => o.id),
     };
     sessionRef.current = finished;
     void persist(finished);
@@ -456,7 +474,13 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
             <View style={[styles.banner, banner.kind === 'photo' && styles.bannerPhoto]}>
               <Text style={styles.bannerText}>{banner.text}</Text>
               {banner.kind === 'story' ? (
-                <Text style={styles.bannerMeta}>Versión {banner.version} · música en duck</Text>
+                <Text style={styles.bannerMeta}>
+                  Versión {banner.version} · música en duck
+                  {route.storyPoints.find((sp) => sp.id === banner.storyPointId)
+                    ?.partnerOfferId
+                    ? ' · código al terminar, no pares en la calle'
+                    : ''}
+                </Text>
               ) : (
                 <View style={styles.bannerActions}>
                   <Pressable style={styles.bannerBtn} onPress={capturePhoto}>

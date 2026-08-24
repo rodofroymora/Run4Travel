@@ -72,8 +72,9 @@ src/
 - Photo Spots: cámara/galería (`expo-image-picker`); safety gate intacto
 - GPS: en dispositivo usa `expo-location`; en web / sin permiso → simulación a lo largo de la polyline
 - Strava: OAuth real + upload GPX si hay Client ID + Secret; si no → mock. Secret en app = solo demo.
-- ✦ Rank: `EXPO_PUBLIC_LLM_API_KEY` → rank/order real; sin key → mock local. Geometría siempre del router.
+- ✦ Rank + stories + álbum: `EXPO_PUBLIC_LLM_API_KEY`; sin key → mock local. Geometría siempre del router.
 - Ciudades dinámicas (SPEC-014): geocode Nominatim/Mapbox + POIs; catálogo curado cuando existe.
+- Cafés partner (SPEC-015): estilo **Cafés**, descuentos demo al terminar (códigos `R4T-…`).
 - Share: SVG client-side + share sheet / media library (no Skia bitmap aún).
 
 ### Env (ver `.env.example`)

@@ -9,19 +9,20 @@ Flujo de ramas y slices futuros: [docs/dev-workflow.md](../docs/dev-workflow.md)
 | ID | Spec | Fase GP | IA | Status |
 |----|------|---------|----|--------|
 | [SPEC-001](./SPEC-001-city-distance-selection.md) | Selección de ciudad, punto de partida y distancia | Choose City → Distance | No | implemented (client v1) |
-| [SPEC-002](./SPEC-002-ai-route-generation.md) | ✦ Generación de Discovery Run | Generate Route | Sí | hardened (LLM + Mapbox) |
+| [SPEC-002](./SPEC-002-ai-route-generation.md) | ✦ Generación de Discovery Run | Generate Route | Sí | hardened (LLM rank + stories) |
 | [SPEC-003](./SPEC-003-route-preview.md) | Preview ruta + Story Points + Photo Spots | Preview | No* | implemented (client v1 mock) |
 | [SPEC-004](./SPEC-004-active-run-tracking.md) | Carrera activa: GPS, nav, métricas | START RUN | No | implemented (client v1 mock) |
 | [SPEC-005](./SPEC-005-pace-aware-storytelling.md) | Narración adaptada al ritmo + música | AI Story ↔ Music | Sí | hardened (TTS cache + duck) |
 | [SPEC-006](./SPEC-006-photo-spots.md) | Photo Spots durante la carrera | 📸 Photo Spot | No* | implemented (client v1 mock) |
 | [SPEC-007](./SPEC-007-run-summary.md) | Resumen post-carrera | Running Summary | No | implemented (client v1 mock) |
-| [SPEC-008](./SPEC-008-ai-travel-album.md) | ✦ AI Travel Album + editor | Album → Customize | Sí | hardened (layouts/cover/crop) |
+| [SPEC-008](./SPEC-008-ai-travel-album.md) | ✦ AI Travel Album + editor | Album → Customize | Sí | hardened (LLM copy + editor) |
 | [SPEC-009](./SPEC-009-social-sharing.md) | Export / share social | Share | No | hardened (SVG + native share) |
 | [SPEC-010](./SPEC-010-strava-sync.md) | Sync actividad a Strava | Sync to Strava | No | hardened (OAuth + GPX upload) |
 | [SPEC-011](./SPEC-011-traveler-run-clubs.md) | Traveler Run Clubs | Community | No | implemented (client MVP mock) |
 | [SPEC-012](./SPEC-012-explore.md) | Explorar ciudades y estilos | Discover | No | implemented (client MVP) |
 | [SPEC-013](./SPEC-013-profile.md) | Perfil y stats | Profile | No | implemented (client MVP) |
 | [SPEC-014](./SPEC-014-ai-dynamic-city-route.md) | ✦ Ciudad/ruta dinámicas | Choose City → Generate | Sí | implemented (client v1) |
+| [SPEC-015](./SPEC-015-cafe-partner-routes.md) | Rutas de cafés + descuentos | Cafés → Summary codes | No* | implemented (client v1 demo) |
 
 \*Puede usar IA en ranking/copy; la geometría y coords nunca las inventa un LLM.
 

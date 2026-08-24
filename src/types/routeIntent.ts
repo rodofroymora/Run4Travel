@@ -11,6 +11,7 @@ export const ROUTE_STYLES = [
   'architecture',
   'hidden_gems',
   'waterfront',
+  'cafes',
 ] as const;
 
 export type RouteStyle = (typeof ROUTE_STYLES)[number];
@@ -23,6 +24,7 @@ export const ROUTE_STYLE_LABELS: Record<RouteStyle, string> = {
   architecture: 'Architecture',
   hidden_gems: 'Hidden Gems',
   waterfront: 'Waterfront',
+  cafes: 'Cafés',
 };
 
 export type GeoPoint = {

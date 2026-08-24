@@ -95,6 +95,14 @@ async function main() {
 
   assert.equal(typeof isDistanceIdeal(route.distanceM, 10), 'boolean');
 
+  const cafeRoute = await generateDiscoveryRoute(
+    { ...intent, style: 'cafes' },
+    mockSafeRouter,
+  );
+  assertNoInventedGeometry(cafeRoute, catalog);
+  assert.ok((cafeRoute.partnerOffers?.length ?? 0) > 0);
+  assert.ok(cafeRoute.name.toLowerCase().includes('coffee') || cafeRoute.intent.style === 'cafes');
+
   console.log('routeGeneration tests: ok');
 }
 

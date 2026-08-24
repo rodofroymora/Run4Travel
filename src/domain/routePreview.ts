@@ -17,6 +17,7 @@ const CATEGORY_ES: Record<string, string> = {
   historic: 'Histórico',
   viewpoint: 'Mirador',
   landmark: 'Icono',
+  cafe: 'Café',
 };
 
 export function categoryLabelEs(category: string): string {

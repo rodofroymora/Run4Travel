@@ -96,7 +96,8 @@ export async function fetchLlmPlaceRank(args: {
 
   const system = `You are ✦, the Run4Travel curator. Select and order running-friendly cultural places.
 Return ONLY JSON: {"placeIds":["id",...],"blurbs":{"id":"short ES blurb"},"routeTitle":"optional title"}.
-Rules: use only provided ids; never invent coordinates, streets, or geometry; max ${args.maxCount} places; prefer safe sidewalks/parks; match style "${args.style}".`;
+Rules: use only provided ids; never invent coordinates, streets, or geometry; max ${args.maxCount} places; prefer safe sidewalks/parks; match style "${args.style}".
+If style is "cafes", prefer category cafe / styles cafes.`;
 
   const user = `City: ${args.cityName}
 DistanceKm: ${args.distanceKm}

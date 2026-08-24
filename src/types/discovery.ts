@@ -1,3 +1,4 @@
+import type { PartnerOffer } from './partner';
 import type { RouteIntent } from './routeIntent';
 
 export type Place = {
@@ -17,11 +18,13 @@ export type StoryVersionKey = 'quick' | 'standard' | 'deep';
 export type StoryPoint = {
   id: string;
   placeId: string;
+  placeName?: string;
   shortDescription: string;
   storyVersions: Record<StoryVersionKey, string>;
   audio?: Partial<Record<StoryVersionKey, string>>;
   durationSec: Record<StoryVersionKey, number>;
   photoSpotId?: string;
+  partnerOfferId?: string;
 };
 
 export type PhotoSpot = {
@@ -43,6 +46,9 @@ export type DiscoveryRoute = {
   estimatedMovingTimeSec: number;
   storyPoints: StoryPoint[];
   photoSpots: PhotoSpot[];
+  /** Selected waypoints (catalog/POI). Used when city is dynamic. */
+  places?: Place[];
+  partnerOffers?: PartnerOffer[];
   provider: { router: string; llm?: string };
   createdAt: string;
   cacheKey: string;

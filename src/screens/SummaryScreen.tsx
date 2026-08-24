@@ -12,6 +12,7 @@ import { MedalBadge } from '../components/MedalBadge';
 import { PaceChart } from '../components/PaceChart';
 import { formatDistanceKm, formatDuration, formatPace } from '../domain/geo';
 import { splitsToChartBars } from '../domain/runMetrics';
+import { unlockOffers } from '../domain/partnerOffers';
 import { buildRunSummary, medalLabel } from '../domain/runSummary';
 import { track } from '../services/analytics';
 import { generateAlbumForRun, getAlbumByRunId } from '../services/albumStore';
@@ -101,6 +102,21 @@ export function SummaryScreen({
     ? splitsToChartBars(summary.splits, { maxBars: 12 })
     : undefined;
 
+  const unlockedOffers = useMemo(
+    () =>
+      unlockOffers({
+        offers: route.partnerOffers ?? [],
+        storyPoints: route.storyPoints,
+        heardStoryPointIds: session.storyEvents.map((e) => e.storyPointId),
+        cafeRoute: route.intent.style === 'cafes',
+      }).filter(
+        (o) =>
+          !session.unlockedOfferIds?.length ||
+          session.unlockedOfferIds.includes(o.id),
+      ),
+    [route, session],
+  );
+
   return (
     <BatlloBackground>
       <ScrollView
@@ -159,6 +175,26 @@ export function SummaryScreen({
             emptyLabel="Sin splits en esta sesión"
           />
         </View>
+
+        {unlockedOffers.length > 0 ? (
+          <View style={styles.offerBlock}>
+            <Text style={styles.offerEyebrow}>CÓDIGOS CAFÉ</Text>
+            <Text style={styles.offerLead}>
+              Desbloqueados al terminar · úsalos en acera / interior, no en carrera
+            </Text>
+            {unlockedOffers.map((o) => (
+              <View key={o.id} style={styles.offerCard}>
+                <Text style={styles.offerVenue}>{o.venueName}</Text>
+                <Text style={styles.offerPerk}>{o.perk}</Text>
+                <Text style={styles.offerCode}>{o.code}</Text>
+                <Text style={styles.offerTerms}>
+                  {o.demo ? 'Demo · no válido en caja. ' : ''}
+                  {o.terms}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         <Pressable
           style={({ pressed }) => [styles.albumCard, pressed && styles.pressed]}
@@ -345,6 +381,52 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemi,
     fontSize: 14,
     color: colors.terracotta,
+  },
+  offerBlock: {
+    marginBottom: spacing.lg,
+  },
+  offerEyebrow: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 11,
+    letterSpacing: 1.1,
+    color: colors.terracotta,
+    marginBottom: 4,
+  },
+  offerLead: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.secondaryText,
+    marginBottom: 10,
+  },
+  offerCard: {
+    backgroundColor: colors.ink,
+    padding: 14,
+    marginBottom: 8,
+    ...radii.cardStat,
+  },
+  offerVenue: {
+    fontFamily: fonts.headingBold,
+    fontSize: 16,
+    color: colors.surface,
+  },
+  offerPerk: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: 'rgba(255,248,239,0.75)',
+    marginTop: 4,
+  },
+  offerCode: {
+    marginTop: 8,
+    fontFamily: fonts.monoBold,
+    fontSize: 18,
+    color: colors.mosaicYellow,
+    letterSpacing: 1,
+  },
+  offerTerms: {
+    marginTop: 6,
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: 'rgba(255,248,239,0.45)',
   },
   shareBtn: {
     backgroundColor: colors.terracotta,

@@ -267,7 +267,7 @@ export function CreateRouteScreen({
         <Text style={styles.title}>{STEP_TITLE[step]}</Text>
         <Text style={styles.subtitle}>
           {step === 'style'
-            ? 'Default: Highlights — cámbialo si quieres otra vibra.'
+            ? 'Default: Highlights — o Cafés si quieres un coffee run con descuento al terminar.'
             : 'Distance is a constraint. Experience is the objective.'}
         </Text>
 

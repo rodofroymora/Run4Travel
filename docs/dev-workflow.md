@@ -34,7 +34,7 @@ Golden Path cliente mock v1 base: `cursor/golden-path-client-v1` / commit en `ma
 | `cursor/gp-album-share` | Editor álbum + export stub UX | 008 + 009 ✅ |
 | `cursor/gp-strava` | OAuth mock + outbox Strava | 010 ✅ |
 | `cursor/gp-strava-oauth` | OAuth real + upload API | 010 ✅ |
-| `cursor/gp-hardening-ai-dynamic` | Share SVG, Strava GPX, LLM rank, TTS cache, album editor, ciudades dinámicas | 002/005/008–010/014 |
+| `cursor/gp-hardening-ai-dynamic` | Share SVG, Strava GPX, LLM rank/stories/album, TTS cache, ciudades dinámicas, Coffee Run + descuentos | 002/005/008–010/014/015 |
 
 Cada slice abre PR contra trunk cuando el demo del hardening esté listo; las specs se actualizan solo si cambia el contrato.
 

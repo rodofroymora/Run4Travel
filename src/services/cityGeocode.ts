@@ -136,6 +136,7 @@ export async function geocodeCity(query: string): Promise<City | null> {
 
 function categoryFor(item: NominatimItem): string {
   const t = `${item.class ?? ''}:${item.type ?? ''}`;
+  if (t.includes('cafe') || t.includes('coffee')) return 'cafe';
   if (t.includes('park') || t.includes('garden')) return 'park';
   if (t.includes('museum') || t.includes('attraction')) return 'landmark';
   if (t.includes('place_of_worship') || t.includes('cathedral')) return 'historic';
@@ -151,6 +152,8 @@ function stylesFor(category: string): string[] {
       return ['waterfront', 'scenic', 'highlights'];
     case 'historic':
       return ['historic', 'architecture', 'highlights'];
+    case 'cafe':
+      return ['cafes', 'hidden_gems', 'highlights'];
     default:
       return ['highlights', 'architecture', 'scenic', 'historic'];
   }
@@ -160,6 +163,7 @@ function stylesFor(category: string): string[] {
 export async function fetchDynamicPlaces(
   city: City,
   limit = 16,
+  opts?: { cafes?: boolean },
 ): Promise<Place[]> {
   const viewbox = [
     city.bounds.minLng,
@@ -168,12 +172,14 @@ export async function fetchDynamicPlaces(
     city.bounds.minLat,
   ].join(',');
 
-  const queries = [
-    'tourism=attraction',
-    'tourism=museum',
-    'leisure=park',
-    'historic=monument',
-  ];
+  const queries = opts?.cafes
+    ? ['amenity=cafe', 'amenity=coffee_shop', 'tourism=attraction']
+    : [
+        'tourism=attraction',
+        'tourism=museum',
+        'leisure=park',
+        'historic=monument',
+      ];
 
   const seen = new Set<string>();
   const places: Place[] = [];
