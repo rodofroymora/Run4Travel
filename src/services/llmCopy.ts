@@ -64,11 +64,12 @@ export function parseStoriesJson(
     const quick = typeof rec.quick === 'string' ? rec.quick.trim() : '';
     const standard = typeof rec.standard === 'string' ? rec.standard.trim() : '';
     const deep = typeof rec.deep === 'string' ? rec.deep.trim() : '';
-    if (quick.length < 20 || standard.length < 40) continue;
+    // Podcast segments need real spoken length
+    if (quick.length < 80 || standard.length < 160) continue;
     out[id] = {
-      quick: quick.slice(0, 220),
-      standard: standard.slice(0, 480),
-      deep: (deep || standard).slice(0, 900),
+      quick: quick.slice(0, 520),
+      standard: standard.slice(0, 1100),
+      deep: (deep || standard).slice(0, 2200),
     };
   }
   return out;
@@ -87,20 +88,26 @@ export async function fetchLlmStories(args: {
     name: p.name,
     category: p.category,
   }));
-  const system = `You are ✦, Run4Travel's local running guide. Write spoken stories in Spanish (or locale ${args.locale}).
+  const system = `You are ✦, host of a running podcast guide for Run4Travel.
+Write SPOKEN podcast scripts the runner hears in headphones while jogging past each place.
+Language: Spanish (locale ${args.locale}). Second person to the runner ("mientras pasas…", "mira a tu izquierda…").
 Return ONLY JSON: {"stories":{"placeId":{"quick":"","standard":"","deep":""}}}.
-quick ≤ 25s (~40–90 words chars 80–180), standard ≤ 55s, deep ≤ 110s.
-Use only provided ids. Never invent coordinates, streets, or places. No "LLM". Tone: sensory, cultural, safe sidewalks.`;
+Lengths (spoken, not tweets):
+- quick: ~45–60 seconds (220–380 characters) — teaser episode
+- standard: ~90–120 seconds (500–850 characters) — main podcast hit
+- deep: ~2–3 minutes (900–1800 characters) — extended cut
+Voice: warm radio host, sensory, cultural, safe sidewalks. Start with a brief host cue like "✦ …".
+Use only provided ids. Never invent coordinates, streets, or places. Never say "LLM". No stage directions in brackets.`;
   try {
     const raw = await completeJson(
       system,
-      `City: ${args.cityName}\nStyle: ${args.style}\nPlaces: ${JSON.stringify(compact)}`,
-      0.55,
+      `City: ${args.cityName}\nStyle: ${args.style}\nPodcast stops: ${JSON.stringify(compact)}`,
+      0.6,
     );
     if (!raw) return null;
     const stories = parseStoriesJson(raw, allowedIds);
     if (Object.keys(stories).length === 0) throw new Error('empty stories');
-    track('story_llm_succeeded', { n: Object.keys(stories).length });
+    track('story_llm_succeeded', { n: Object.keys(stories).length, format: 'podcast' });
     return stories;
   } catch (e) {
     track('story_llm_failed', {

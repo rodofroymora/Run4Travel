@@ -2,18 +2,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Speech from 'expo-speech';
 import { Platform } from 'react-native';
 import { track } from './analytics';
+import { playPremiumTts, stopPremiumPlayback } from './premiumTts';
 
 export type SpeakStoryOptions = {
   text: string;
   locale?: string;
   cacheKey?: string;
+  /** Prefer OpenAI TTS when key present (podcast quality). */
+  preferPremium?: boolean;
   onDone?: () => void;
   onError?: () => void;
 };
 
 export type AudioCacheEntry = {
   key: string;
-  /** On-device TTS: mark text+locale as warmed (no CDN file yet). */
   uri: string;
   durationSec: number;
   createdAt: string;
@@ -31,8 +33,7 @@ function hashScript(text: string): string {
 }
 
 function estimateDurationSec(text: string): number {
-  // ~14 chars/sec Spanish narration
-  return Math.max(4, Math.round(text.length / 14));
+  return Math.max(20, Math.round(text.length / 13));
 }
 
 async function readCache(): Promise<Record<string, AudioCacheEntry>> {
@@ -64,7 +65,6 @@ export async function getStoryAudioCacheEntry(
   return map[key] ?? null;
 }
 
-/** Prefetch / warm cache entries for offline pack (Generate → Cache → Reuse). */
 export async function warmStoryAudioCache(
   entries: { key: string; text: string; durationSec?: number }[],
 ): Promise<number> {
@@ -89,26 +89,9 @@ export async function warmStoryAudioCache(
   return added;
 }
 
-/**
- * On-device TTS for story playback (offline-capable).
- * Cache marks scripts as warmed so offline pack can report audio readiness.
- */
-export async function speakStory(opts: SpeakStoryOptions): Promise<'spoken' | 'skipped'> {
+async function speakDeviceTts(opts: SpeakStoryOptions): Promise<'spoken' | 'skipped'> {
   const text = opts.text.trim();
-  if (!text) {
-    opts.onDone?.();
-    return 'skipped';
-  }
-
   const locale = opts.locale ?? 'es-ES';
-  const key = opts.cacheKey ?? `ad-hoc+${locale}+${hashScript(text)}`;
-  const existing = await getStoryAudioCacheEntry(key);
-  if (existing) {
-    track('story_cache_hit', { key });
-  } else {
-    await warmStoryAudioCache([{ key, text }]);
-  }
-
   try {
     const available = await Speech.getAvailableVoicesAsync().catch(() => []);
     if (Platform.OS !== 'web' && available.length === 0) {
@@ -116,15 +99,15 @@ export async function speakStory(opts: SpeakStoryOptions): Promise<'spoken' | 's
       opts.onDone?.();
       return 'skipped';
     }
-
-    track('story_tts_started', { chars: text.length, cached: existing ? 1 : 0 });
+    track('story_tts_started', { chars: text.length, engine: 'device' });
     await new Promise<void>((resolve) => {
       Speech.stop();
       Speech.speak(text, {
         language: locale,
-        rate: 0.94,
+        rate: Platform.OS === 'ios' ? 0.92 : 0.88,
+        pitch: 1.0,
         onDone: () => {
-          track('story_tts_completed', {});
+          track('story_tts_completed', { engine: 'device' });
           opts.onDone?.();
           resolve();
         },
@@ -133,7 +116,7 @@ export async function speakStory(opts: SpeakStoryOptions): Promise<'spoken' | 's
           resolve();
         },
         onError: () => {
-          track('story_tts_failed', {});
+          track('story_tts_failed', { engine: 'device' });
           opts.onError?.();
           opts.onDone?.();
           resolve();
@@ -149,7 +132,40 @@ export async function speakStory(opts: SpeakStoryOptions): Promise<'spoken' | 's
   }
 }
 
+/**
+ * Podcast playback: premium OpenAI TTS when possible, else device speech.
+ */
+export async function speakStory(opts: SpeakStoryOptions): Promise<'spoken' | 'skipped'> {
+  const text = opts.text.trim();
+  if (!text) {
+    opts.onDone?.();
+    return 'skipped';
+  }
+
+  const locale = opts.locale ?? 'es-ES';
+  const key = opts.cacheKey ?? `ad-hoc+${locale}+${hashScript(text)}`;
+  const existing = await getStoryAudioCacheEntry(key);
+  if (existing) track('story_cache_hit', { key });
+  else await warmStoryAudioCache([{ key, text }]);
+
+  const preferPremium = opts.preferPremium !== false;
+  if (preferPremium) {
+    const result = await playPremiumTts(text, {
+      onDone: opts.onDone,
+      onError: opts.onError,
+    });
+    if (result === 'premium') {
+      track('story_tts_started', { chars: text.length, engine: 'premium' });
+      track('story_tts_completed', { engine: 'premium' });
+      return 'spoken';
+    }
+  }
+
+  return speakDeviceTts(opts);
+}
+
 export function stopStorySpeech(): void {
+  stopPremiumPlayback();
   try {
     Speech.stop();
   } catch {

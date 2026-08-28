@@ -39,6 +39,7 @@ type Props = {
 };
 
 type Banner =
+  | { kind: 'intro'; text: string }
   | { kind: 'story'; text: string; version: StoryVersionKey; storyPointId: string }
   | { kind: 'photo'; text: string; photoSpotId: string; placeName: string }
   | null;
@@ -85,6 +86,15 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
   const [gpsSource, setGpsSource] = useState<GpsSource>('demo');
   const [gpsHint, setGpsHint] = useState<string | null>(null);
   const [forceDemo, setForceDemo] = useState(false);
+  const [hasReplay, setHasReplay] = useState(false);
+  const introPlayed = useRef(false);
+  const lastSpoken = useRef<{
+    text: string;
+    cacheKey: string;
+    kind: 'intro' | 'story';
+    version?: StoryVersionKey;
+    storyPointId?: string;
+  } | null>(null);
   const startMs = useRef(Date.now());
   const pausedAccumMs = useRef(0);
   const pauseStarted = useRef<number | null>(null);
@@ -186,6 +196,69 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
     };
   }, [route, onSample, persist, forceDemo]);
 
+  // Podcast intro at run start
+  useEffect(() => {
+    if (introPlayed.current) return;
+    const intro = route.podcastIntro?.trim();
+    if (!intro) return;
+    introPlayed.current = true;
+    const locale = route.intent.locale || 'es-ES';
+    const cacheKey = storyCacheKey('route-intro', 'standard', locale, intro);
+    lastSpoken.current = { text: intro, cacheKey, kind: 'intro' };
+    setHasReplay(true);
+    void duckMusic();
+    setBanner({ kind: 'intro', text: '✦ Intro · Discovery Run' });
+    track('story_played', { storyPointId: 'intro', version: 'standard', format: 'podcast_intro' });
+    void speakStory({
+      text: intro,
+      locale,
+      cacheKey,
+      onDone: () => {
+        void resumeMusic();
+        setBanner((b) => (b?.kind === 'intro' ? null : b));
+      },
+    });
+  }, [route]);
+
+  const skipAudio = useCallback(() => {
+    stopStorySpeech();
+    void resumeMusic();
+    setBanner(null);
+    track('story_tts_skipped', { reason: 'user_skip' });
+  }, []);
+
+  const replayAudio = useCallback(() => {
+    const last = lastSpoken.current;
+    if (!last) return;
+    stopStorySpeech();
+    const locale = route.intent.locale || 'es-ES';
+    void duckMusic();
+    if (last.kind === 'intro') {
+      setBanner({ kind: 'intro', text: '✦ Intro · Discovery Run' });
+    } else if (last.storyPointId && last.version) {
+      setBanner({
+        kind: 'story',
+        text: `✦ Podcast · replay`,
+        version: last.version,
+        storyPointId: last.storyPointId,
+      });
+    }
+    track('story_played', {
+      storyPointId: last.storyPointId ?? 'intro',
+      version: last.version ?? 'standard',
+      format: 'podcast_replay',
+    });
+    void speakStory({
+      text: last.text,
+      locale,
+      cacheKey: last.cacheKey,
+      onDone: () => {
+        void resumeMusic();
+        setBanner(null);
+      },
+    });
+  }, [route.intent.locale]);
+
   const userPos = samples[samples.length - 1];
   const pace = currentPaceSecPerKm(samples) || sessionRef.current.avgPaceSecPerKm || 330;
   const liveBars = useMemo(
@@ -226,9 +299,7 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
           void duckMusic();
           setBanner({
             kind: 'story',
-            text: sp.partnerOfferId
-              ? `✦ ${place.name} · café partner cerca`
-              : `✦ Te acercas a ${place.name}`,
+            text: `✦ Podcast · ${place.name}`,
             version,
             storyPointId: sp.id,
           });
@@ -239,13 +310,22 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
           });
           sessionRef.current.nextStoryIndex = idx + 1;
           void persist();
-          track('story_played', { storyPointId: sp.id, version });
+          track('story_played', { storyPointId: sp.id, version, format: 'podcast' });
           const spoken = sp.storyVersions[version];
           const locale = route.intent.locale || 'es-ES';
+          const cacheKey = storyCacheKey(sp.placeId, version, locale, spoken);
+          lastSpoken.current = {
+            text: spoken,
+            cacheKey,
+            kind: 'story',
+            version,
+            storyPointId: sp.id,
+          };
+          setHasReplay(true);
           void speakStory({
             text: spoken,
             locale,
-            cacheKey: storyCacheKey(sp.placeId, version, locale, spoken),
+            cacheKey,
             onDone: () => {
               void resumeMusic();
               setBanner((b) => (b?.kind === 'story' ? null : b));
@@ -427,6 +507,7 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
             markers={markers}
             height={180}
             label={nextPlace ? `Próximo: ${nextPlace.name} · ${Math.round(nextPlace.dist)} m` : 'Meta cercana'}
+            followUser={Boolean(userPos)}
           />
 
           <View style={styles.metrics}>
@@ -473,14 +554,35 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
           {banner ? (
             <View style={[styles.banner, banner.kind === 'photo' && styles.bannerPhoto]}>
               <Text style={styles.bannerText}>{banner.text}</Text>
-              {banner.kind === 'story' ? (
-                <Text style={styles.bannerMeta}>
-                  Versión {banner.version} · música en duck
-                  {route.storyPoints.find((sp) => sp.id === banner.storyPointId)
-                    ?.partnerOfferId
-                    ? ' · código al terminar, no pares en la calle'
-                    : ''}
-                </Text>
+              {banner.kind === 'intro' || banner.kind === 'story' ? (
+                <>
+                  {banner.kind === 'story' ? (
+                    <>
+                      <Text style={styles.bannerMeta}>
+                        Escuchando episodio · {banner.version} · ~
+                        {route.storyPoints.find((sp) => sp.id === banner.storyPointId)?.durationSec[
+                          banner.version
+                        ] ?? '—'}
+                        s
+                      </Text>
+                      <Text style={styles.bannerTranscript} numberOfLines={4}>
+                        {route.storyPoints.find((sp) => sp.id === banner.storyPointId)?.storyVersions[
+                          banner.version
+                        ] ?? ''}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.bannerMeta}>Intro del podcast · puedes saltar o repetir</Text>
+                  )}
+                  <View style={styles.bannerActions}>
+                    <Pressable style={styles.bannerBtnGhost} onPress={skipAudio}>
+                      <Text style={styles.bannerBtnGhostLabel}>Saltar</Text>
+                    </Pressable>
+                    <Pressable style={styles.bannerBtn} onPress={replayAudio}>
+                      <Text style={styles.bannerBtnLabel}>Replay</Text>
+                    </Pressable>
+                  </View>
+                </>
               ) : (
                 <View style={styles.bannerActions}>
                   <Pressable style={styles.bannerBtn} onPress={capturePhoto}>
@@ -511,6 +613,11 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
                   ? ` · señal débil (~${Math.round(userPos.acc)} m)`
                   : ''}
               </Text>
+              {hasReplay ? (
+                <Pressable onPress={replayAudio} style={styles.gpsToggle}>
+                  <Text style={styles.gpsToggleLabel}>Replay último episodio ✦</Text>
+                </Pressable>
+              ) : null}
               <Pressable
                 onPress={() => setForceDemo((v) => !v)}
                 accessibilityRole="button"
@@ -617,6 +724,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: 'rgba(255,248,239,0.65)',
+  },
+  bannerTranscript: {
+    marginTop: 10,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 19,
+    color: 'rgba(255,248,239,0.88)',
   },
   bannerActions: {
     flexDirection: 'row',

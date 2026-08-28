@@ -166,7 +166,7 @@ export default function App() {
       )}
       {screen === 'create' && (
         <CreateRouteScreen
-          initialCityName={createSeed?.city?.name ?? cityName}
+          initialCityName={createSeed?.city?.name}
           initialCity={createSeed?.city}
           initialStyle={createSeed?.style}
           onClose={goHome}

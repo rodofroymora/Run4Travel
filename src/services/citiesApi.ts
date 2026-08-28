@@ -1,4 +1,5 @@
 import { CITIES, START_SUGGESTIONS } from '../data/cities';
+import { resolveCatalogKey } from '../data/places';
 import type { City, StartSuggestion } from '../types/routeIntent';
 import {
   fetchDynamicPlaces,
@@ -40,14 +41,28 @@ export function rememberDynamicCity(city: City): City {
   return city;
 }
 
-/** Resolve free-text city via geocoder (SPEC-014). */
+/** Resolve free-text city via geocoder (SPEC-014). Prefer curated catalog match. */
 export async function resolveCityQuery(query: string): Promise<City | null> {
-  const local = searchCities(query).find(
-    (c) => c.name.toLowerCase() === query.trim().toLowerCase() && c.supported,
+  const q = query.trim().toLowerCase();
+  const local = CITIES.find(
+    (c) =>
+      c.supported &&
+      (c.name.toLowerCase() === q ||
+        c.name.toLowerCase().includes(q) ||
+        c.id === q),
   );
   if (local) return local;
+
+  const fromSearch = searchCities(query).find((c) => c.supported);
+  if (fromSearch && !fromSearch.id.startsWith('dyn-')) return fromSearch;
+
   const geo = await geocodeCity(query);
   if (!geo) return null;
+
+  const catalogKey = resolveCatalogKey(geo.id, geo.name);
+  const curated = CITIES.find((c) => c.id === catalogKey && c.supported);
+  if (curated) return curated;
+
   return rememberDynamicCity(geo);
 }
 
@@ -58,19 +73,36 @@ export async function suggestDiscoveryCities(
   return suggestCitiesWithLlm(hint);
 }
 
-/** Mock `GET /cities/:id/start-suggestions` + dynamic POI starts. */
+function curatedStartsFor(city: City): StartSuggestion[] {
+  const key = resolveCatalogKey(city.id, city.name);
+  return START_SUGGESTIONS[key] ?? START_SUGGESTIONS[city.id] ?? [];
+}
+
+/** Mock `GET /cities/:id/start-suggestions` */
 export function getStartSuggestions(cityId: string): StartSuggestion[] {
-  return START_SUGGESTIONS[cityId] ?? [];
+  const key = resolveCatalogKey(cityId);
+  return START_SUGGESTIONS[key] ?? START_SUGGESTIONS[cityId] ?? [];
 }
 
 export async function getStartSuggestionsAsync(
   city: City,
 ): Promise<StartSuggestion[]> {
-  const curated = START_SUGGESTIONS[city.id];
-  if (curated?.length) return curated;
+  const curated = curatedStartsFor(city);
+  if (curated.length) return curated;
   try {
     const places = await fetchDynamicPlaces(city, 8);
-    if (places.length) return startSuggestionsFromPlaces(places);
+    if (places.length) {
+      return [
+        {
+          id: `${city.id}-center`,
+          label: `Centro · ${city.name}`,
+          lat: city.center.lat,
+          lng: city.center.lng,
+          kind: 'zone',
+        },
+        ...startSuggestionsFromPlaces(places),
+      ];
+    }
   } catch {
     // fall through
   }
@@ -80,7 +112,7 @@ export async function getStartSuggestionsAsync(
       label: `Centro · ${city.name}`,
       lat: city.center.lat,
       lng: city.center.lng,
-      kind: 'plaza',
+      kind: 'zone',
     },
   ];
 }

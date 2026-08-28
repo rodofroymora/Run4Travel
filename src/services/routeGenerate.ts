@@ -1,5 +1,10 @@
 import { cafePlacesForCity } from '../data/cafes';
-import { PLACES_BY_CITY, getPlacesForCity as getCatalogPlaces } from '../data/places';
+import {
+  PLACES_BY_CITY,
+  getPlacesForCity as getCatalogPlaces,
+  resolveCatalogKey,
+} from '../data/places';
+import { haversineM } from '../domain/geo';
 import {
   assertNoInventedGeometry,
   assertRouterOwnedGeometry,
@@ -9,7 +14,7 @@ import {
   isDistanceWithinTolerance,
 } from '../domain/routeGeneration';
 import type { DiscoveryRoute, Place } from '../types/discovery';
-import type { RouteIntent } from '../types/routeIntent';
+import type { City, RouteIntent } from '../types/routeIntent';
 import { track } from './analytics';
 import { fetchDynamicPlaces, geocodeCity } from './cityGeocode';
 import { getLlmApiKey } from './llmRank';
@@ -38,14 +43,38 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** Catalog ∪ dynamic POIs. Coords always from catalog/geocoder — never ✦. */
-export async function resolvePlacesForIntent(intent: RouteIntent): Promise<Place[]> {
-  const catalog = getCatalogPlaces(intent.cityId, intent.start);
-  const partners = cafePlacesForCity(intent.cityId);
-  const hasCurated = Boolean(PLACES_BY_CITY[intent.cityId]?.length);
-  const wantCafes = intent.style === 'cafes';
+function sortNearStart(
+  places: Place[],
+  start: { lat: number; lng: number },
+  maxM: number,
+): Place[] {
+  return places
+    .map((p) => ({ p, d: haversineM(start, p) }))
+    .filter((x) => x.d <= maxM)
+    .sort((a, b) => a.d - b.d)
+    .map((x) => x.p);
+}
 
-  const city =
+function nearestPlaces(
+  places: Place[],
+  start: { lat: number; lng: number },
+  limit: number,
+): Place[] {
+  return [...places]
+    .sort((a, b) => haversineM(start, a) - haversineM(start, b))
+    .slice(0, limit);
+}
+
+/** Catalog ∪ dynamic POIs around the chosen start (zone), not only downtown. */
+export async function resolvePlacesForIntent(intent: RouteIntent): Promise<Place[]> {
+  const catalogKey = resolveCatalogKey(intent.cityId, intent.cityName);
+  const catalog = getCatalogPlaces(catalogKey, intent.start);
+  const partners = cafePlacesForCity(catalogKey);
+  const wantCafes = intent.style === 'cafes';
+  // Keep discovery inside a loop reachable from the start zone.
+  const searchRadiusM = Math.max(2800, intent.distanceKm * 1000 * 0.32);
+
+  const cityBase =
     getCityById(intent.cityId) ??
     (await geocodeCity(intent.cityName)) ?? {
       id: intent.cityId,
@@ -53,14 +82,26 @@ export async function resolvePlacesForIntent(intent: RouteIntent): Promise<Place
       country: '',
       center: intent.start,
       bounds: {
-        minLat: intent.start.lat - 0.08,
-        maxLat: intent.start.lat + 0.08,
-        minLng: intent.start.lng - 0.08,
-        maxLng: intent.start.lng + 0.08,
+        minLat: intent.start.lat - 0.06,
+        maxLat: intent.start.lat + 0.06,
+        minLng: intent.start.lng - 0.06,
+        maxLng: intent.start.lng + 0.06,
       },
       supported: true,
       locales: [intent.locale],
     };
+
+  // POI search must use the start zone as center (e.g. Angelópolis ≠ Zócalo).
+  const searchCity: City = {
+    ...cityBase,
+    center: { lat: intent.start.lat, lng: intent.start.lng },
+    bounds: {
+      minLat: intent.start.lat - 0.055,
+      maxLat: intent.start.lat + 0.055,
+      minLng: intent.start.lng - 0.055,
+      maxLng: intent.start.lng + 0.055,
+    },
+  };
 
   const merge = (lists: Place[][]): Place[] => {
     const byKey = new Map<string, Place>();
@@ -73,9 +114,11 @@ export async function resolvePlacesForIntent(intent: RouteIntent): Promise<Place
     return [...byKey.values()];
   };
 
+  const nearCatalog = sortNearStart(catalog, intent.start, searchRadiusM);
   let dynamic: Place[] = [];
   try {
-    dynamic = await fetchDynamicPlaces(city, wantCafes ? 18 : 16, {
+    // Always enrich from start zone — curated downtown alone is wrong for Angelópolis.
+    dynamic = await fetchDynamicPlaces(searchCity, wantCafes ? 18 : 16, {
       cafes: wantCafes,
     });
   } catch {
@@ -83,22 +126,50 @@ export async function resolvePlacesForIntent(intent: RouteIntent): Promise<Place
   }
 
   if (wantCafes) {
-    const cafes = merge([partners, dynamic.filter((p) => p.category === 'cafe'), catalog.filter((p) => p.category === 'cafe')]);
-    if (cafes.length >= 3) {
-      track('cafe_route_generated', { cityId: intent.cityId, n: cafes.length });
-      return cafes;
+    const cafes = merge([
+      sortNearStart(partners, intent.start, searchRadiusM),
+      dynamic.filter((p) => p.category === 'cafe'),
+      nearCatalog.filter((p) => p.category === 'cafe'),
+    ]);
+    const nearCafes = sortNearStart(cafes, intent.start, searchRadiusM);
+    if (nearCafes.length >= 3) {
+      track('cafe_route_generated', {
+        cityId: intent.cityId,
+        n: nearCafes.length,
+        start: intent.start.label ?? 'start',
+      });
+      return nearCafes;
     }
-    return merge([cafes, catalog]).slice(0, 14);
+    return nearestPlaces(merge([cafes, catalog]), intent.start, 14);
   }
 
-  if (hasCurated && catalog.length >= 6) {
-    return catalog;
+  const pooled = merge([nearCatalog, dynamic]);
+  const near = sortNearStart(pooled, intent.start, searchRadiusM);
+  if (near.length >= 4) {
+    track('places_near_start', {
+      cityId: intent.cityId,
+      n: near.length,
+      radiusM: Math.round(searchRadiusM),
+      start: intent.start.label ?? 'start',
+      catalogNear: nearCatalog.length,
+      dynamic: dynamic.length,
+    });
+    return near;
   }
 
-  if (dynamic.length >= 4) {
-    return merge([dynamic, catalog]);
+  const fallback = nearestPlaces(merge([catalog, dynamic, partners]), intent.start, 14);
+  if (fallback.length >= 2) {
+    track('places_near_start_fallback', {
+      cityId: intent.cityId,
+      n: fallback.length,
+      start: intent.start.label ?? 'start',
+    });
+    return fallback;
   }
-  return catalog;
+
+  throw new Error(
+    `No encontramos lugares cerca de ${intent.start.label ?? 'tu partida'} en ${intent.cityName}.`,
+  );
 }
 
 export async function generateRoute(

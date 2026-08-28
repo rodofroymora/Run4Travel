@@ -1,7 +1,4 @@
 import { Platform, Share } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
 import { SHARE_ASPECT, buildShareSvg, suggestedCaption } from '../domain/shareFormats';
 import type { ShareAsset, ShareFormat } from '../types/share';
 import { track } from './analytics';
@@ -48,6 +45,8 @@ async function writeShareFile(
     return `data:image/svg+xml;charset=utf-8,${encoded}`;
   }
 
+  // Lazy: keep web free of native modules at import time.
+  const FileSystem = await import('expo-file-system/legacy');
   const base = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
   if (!base) throw new Error('No file system directory');
   const uri = `${base}${fileName}`;
@@ -130,6 +129,7 @@ export async function shareOrSaveAsset(
     }
 
     if (mode === 'save') {
+      const MediaLibrary = await import('expo-media-library');
       const perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) {
         track('share_failed', { format: asset.format, error: 'media_permission' });
@@ -140,6 +140,7 @@ export async function shareOrSaveAsset(
       return 'ok';
     }
 
+    const Sharing = await import('expo-sharing');
     const canShare = await Sharing.isAvailableAsync();
     if (canShare) {
       await Sharing.shareAsync(asset.uri, {

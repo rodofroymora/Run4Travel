@@ -2,7 +2,7 @@ import type { Place } from '../types/discovery';
 import { cafePlacesForCity } from './cafes';
 
 /** Bump when catalog coords/IDs change — invalidates route cache keys. */
-export const PLACE_CATALOG_VERSION = 'v3';
+export const PLACE_CATALOG_VERSION = 'v5';
 
 /** Catálogo curado — coords reales; ✦ solo elige IDs de aquí. */
 export const PLACES_BY_CITY: Record<string, Place[]> = {
@@ -310,6 +310,212 @@ export const PLACES_BY_CITY: Record<string, Place[]> = {
       styles: ['architecture', 'highlights', 'scenic'],
     },
   ],
+  /** Coords reales — Zócalo / centro histórico de Puebla. */
+  puebla: [
+    {
+      id: 'pue-zocalo',
+      name: 'Zócalo de Puebla',
+      lat: 19.0437,
+      lng: -98.1981,
+      category: 'landmark',
+      relevance: 1,
+      safeForRunning: true,
+      styles: ['highlights', 'historic', 'scenic'],
+    },
+    {
+      id: 'pue-catedral',
+      name: 'Catedral de Puebla',
+      lat: 19.0429,
+      lng: -98.198,
+      category: 'historic',
+      relevance: 0.98,
+      safeForRunning: true,
+      styles: ['historic', 'architecture', 'highlights'],
+    },
+    {
+      id: 'pue-rosario',
+      name: 'Capilla del Rosario',
+      lat: 19.0472,
+      lng: -98.1987,
+      category: 'historic',
+      relevance: 0.96,
+      safeForRunning: true,
+      styles: ['historic', 'architecture', 'highlights'],
+    },
+    {
+      id: 'pue-palafoxiana',
+      name: 'Biblioteca Palafoxiana',
+      lat: 19.0426,
+      lng: -98.1977,
+      category: 'historic',
+      relevance: 0.94,
+      safeForRunning: true,
+      styles: ['historic', 'architecture', 'hidden_gems'],
+    },
+    {
+      id: 'pue-parian',
+      name: 'El Parián',
+      lat: 19.0455,
+      lng: -98.1965,
+      category: 'landmark',
+      relevance: 0.9,
+      safeForRunning: true,
+      styles: ['highlights', 'hidden_gems', 'scenic'],
+    },
+    {
+      id: 'pue-artista',
+      name: 'Barrio del Artista',
+      lat: 19.046,
+      lng: -98.1952,
+      category: 'neighborhood',
+      relevance: 0.88,
+      safeForRunning: true,
+      styles: ['hidden_gems', 'scenic', 'highlights'],
+    },
+    {
+      id: 'pue-loreto',
+      name: 'Fuerte de Loreto',
+      lat: 19.0584,
+      lng: -98.1863,
+      category: 'historic',
+      relevance: 0.92,
+      safeForRunning: true,
+      styles: ['historic', 'scenic', 'highlights'],
+    },
+    {
+      id: 'pue-paseo-bravo',
+      name: 'Paseo Bravo',
+      lat: 19.0502,
+      lng: -98.2058,
+      category: 'park',
+      relevance: 0.86,
+      safeForRunning: true,
+      styles: ['parks', 'scenic', 'highlights'],
+    },
+    {
+      id: 'pue-los-fuertes',
+      name: 'Parque de los Fuertes',
+      lat: 19.0575,
+      lng: -98.1848,
+      category: 'park',
+      relevance: 0.87,
+      safeForRunning: true,
+      styles: ['parks', 'historic', 'scenic'],
+    },
+    {
+      id: 'pue-munecos',
+      name: 'Casa de los Muñecos',
+      lat: 19.044,
+      lng: -98.1968,
+      category: 'architecture',
+      relevance: 0.85,
+      safeForRunning: true,
+      styles: ['architecture', 'historic', 'hidden_gems'],
+    },
+    // Zona Angelópolis / Atlixcáyotl — para partidas fuera del centro
+    {
+      id: 'pue-angelopolis',
+      name: 'Angelópolis',
+      lat: 19.0186,
+      lng: -98.2428,
+      category: 'landmark',
+      relevance: 0.9,
+      safeForRunning: true,
+      styles: ['highlights', 'scenic', 'architecture'],
+    },
+    {
+      id: 'pue-atlixcayotl',
+      name: 'Vía Atlixcáyotl',
+      lat: 19.0225,
+      lng: -98.2355,
+      category: 'scenic',
+      relevance: 0.86,
+      safeForRunning: true,
+      styles: ['scenic', 'highlights', 'parks'],
+    },
+    {
+      id: 'pue-jardin-infantil',
+      name: 'Jardín del Arte',
+      lat: 19.0268,
+      lng: -98.2382,
+      category: 'park',
+      relevance: 0.82,
+      safeForRunning: true,
+      styles: ['parks', 'scenic', 'hidden_gems'],
+    },
+    {
+      id: 'pue-latam',
+      name: 'Torre Ejecutiva Angelópolis',
+      lat: 19.0168,
+      lng: -98.2462,
+      category: 'architecture',
+      relevance: 0.8,
+      safeForRunning: true,
+      styles: ['architecture', 'scenic', 'highlights'],
+    },
+    {
+      id: 'pue-sonata',
+      name: 'Sonata',
+      lat: 19.0115,
+      lng: -98.255,
+      category: 'neighborhood',
+      relevance: 0.78,
+      safeForRunning: true,
+      styles: ['scenic', 'parks', 'highlights'],
+    },
+    // La Paz / Fuertes
+    {
+      id: 'pue-fuente-parian',
+      name: 'Fuente de los Frailes',
+      lat: 19.0562,
+      lng: -98.2128,
+      category: 'plaza',
+      relevance: 0.8,
+      safeForRunning: true,
+      styles: ['historic', 'scenic', 'highlights'],
+    },
+    {
+      id: 'pue-fuertes',
+      name: 'Fuerte de Loreto',
+      lat: 19.0588,
+      lng: -98.1855,
+      category: 'historic',
+      relevance: 0.88,
+      safeForRunning: true,
+      styles: ['historic', 'scenic', 'highlights'],
+    },
+    // Cholula
+    {
+      id: 'pue-piramide-cholula',
+      name: 'Gran Pirámide de Cholula',
+      lat: 19.0575,
+      lng: -98.3018,
+      category: 'historic',
+      relevance: 0.94,
+      safeForRunning: true,
+      styles: ['historic', 'scenic', 'highlights', 'architecture'],
+    },
+    {
+      id: 'pue-zocalo-cholula',
+      name: 'Zócalo de Cholula',
+      lat: 19.0632,
+      lng: -98.3045,
+      category: 'plaza',
+      relevance: 0.86,
+      safeForRunning: true,
+      styles: ['historic', 'cafes', 'highlights'],
+    },
+    {
+      id: 'pue-san-francisco-acatepec',
+      name: 'San Francisco Acatepec',
+      lat: 19.0318,
+      lng: -98.3072,
+      category: 'architecture',
+      relevance: 0.84,
+      safeForRunning: true,
+      styles: ['architecture', 'historic', 'hidden_gems'],
+    },
+  ],
 };
 
 /** Editorial blurbs keyed by place id — ✦ may rewrite tone, never coords. */
@@ -344,39 +550,51 @@ export const PLACE_BLURBS: Record<string, string> = {
   'cdmx-unam': 'Murales y campus: la Biblioteca Central es ícono del siglo XX.',
   'cdmx-xochimilco': 'Canales y trajineras: Xochimilco es agua y color al sur.',
   'cdmx-soumaya': 'Escama metálica imposible de ignorar: Soumaya redefine el skyline.',
+  'pue-zocalo': 'El corazón del centro histórico: el Zócalo abre la ciudad a pie de calle.',
+  'pue-catedral': 'Torres que marcan Puebla: la Catedral ancla el centro histórico.',
+  'pue-rosario': 'Dorados del barroco novohispano: la Capilla del Rosario es joya íntima.',
+  'pue-palafoxiana': 'Estantería colonial y silencio: la Palafoxiana es memoria en madera.',
+  'pue-parian': 'Artesanía y color al paso: El Parián es pausa comercial del centro.',
+  'pue-artista': 'Talleres abiertos y callejones: el Barrio del Artista invita a mirar.',
+  'pue-loreto': 'Cerro y memoria de 1862: Loreto mira la ciudad desde arriba.',
+  'pue-paseo-bravo': 'Árboles y sombra urbana: Paseo Bravo es ritmo suave entre avenidas.',
+  'pue-los-fuertes': 'Parque y fuertes: correr aquí es historia al aire libre.',
+  'pue-munecos': 'Fachada de azulejos parlantes: Los Muñecos guardan ironía poblana.',
+  'pue-angelopolis': 'Distrito moderno al sur: Angelópolis abre otro ritmo de la ciudad.',
+  'pue-atlixcayotl': 'Avenida ancha y horizonte: Atlixcáyotl conecta la zona sur.',
+  'pue-jardin-infantil': 'Verde entre torres: un respiro para correr con calma.',
+  'pue-latam': 'Torres de negocios y cielo abierto: el skyline sur de Puebla.',
+  'pue-sonata': 'Residencial y amplias banquetas: Sonata pide zancadas largas.',
+  'pue-fuente-parian': 'Fuente cerca de La Paz: agua y sombra para recuperar el ritmo.',
+  'pue-fuertes': 'Loreto: memoria del 5 de mayo y vista al valle.',
+  'pue-piramide-cholula': 'La Gran Pirámide: el volumen más grande del mundo, coronado por la iglesia.',
+  'pue-zocalo-cholula': 'Zócalo de Cholula: plaza ancha, árboles y café a paso de recovery.',
+  'pue-san-francisco-acatepec': 'Acatepec: fachada de talavera que brilla al sol del mediodía.',
 };
 
-/** Places genéricos alrededor del centro de una ciudad soportada. */
+/** Places: curado → vacío (nunca inventa “Plaza Mayor” genérica). */
 export function getPlacesForCity(cityId: string, center: { lat: number; lng: number }): Place[] {
-  const catalog = PLACES_BY_CITY[cityId];
-  const cafes = cafePlacesForCity(cityId);
+  const catalogKey = resolveCatalogKey(cityId);
+  const catalog = PLACES_BY_CITY[catalogKey];
+  const cafes = cafePlacesForCity(catalogKey);
   if (catalog?.length) {
     const ids = new Set(catalog.map((p) => p.id));
     return [...catalog, ...cafes.filter((c) => !ids.has(c.id))];
   }
+  // Dynamic cities without curated data: only partner cafes if any — no fake POIs.
+  return cafes;
+}
 
-  const offsets = [
-    [0.008, 0.004, 'Plaza Mayor'],
-    [0.004, -0.006, 'Catedral'],
-    [-0.005, 0.007, 'Parque Central'],
-    [0.01, -0.002, 'Mirador Norte'],
-    [-0.007, -0.008, 'Malecón'],
-    [0.002, 0.01, 'Barrio Antiguo'],
-    [-0.01, 0.003, 'Mercado'],
-    [0.006, 0.008, 'Jardines'],
-  ] as const;
-
-  const synthetic: Place[] = offsets.map(([dLat, dLng, name], i) => ({
-    id: `${cityId}-p${i}`,
-    name,
-    lat: center.lat + dLat,
-    lng: center.lng + dLng,
-    category: i % 2 === 0 ? 'landmark' : 'park',
-    relevance: 0.9 - i * 0.05,
-    safeForRunning: true,
-    styles: ['highlights', 'scenic', 'historic', 'parks'],
-  }));
-  return [...cafes, ...synthetic];
+/** Map dyn-* / name-like ids onto curated catalogs when possible. */
+export function resolveCatalogKey(cityId: string, cityName?: string): string {
+  if (PLACES_BY_CITY[cityId]?.length) return cityId;
+  const hay = `${cityId} ${cityName ?? ''}`.toLowerCase();
+  if (hay.includes('puebla')) return 'puebla';
+  if (hay.includes('barcelona') || hay.includes('bcn')) return 'barcelona';
+  if (hay.includes('cdmx') || hay.includes('mexico city') || hay.includes('ciudad de mexico')) {
+    return 'cdmx';
+  }
+  return cityId;
 }
 
 export function blurbForPlace(place: Place): string {

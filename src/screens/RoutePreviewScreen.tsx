@@ -24,6 +24,7 @@ import {
 import { getPlacesForCity } from '../data/places';
 import { track } from '../services/analytics';
 import { downloadOfflinePack, getOfflinePack } from '../services/offlinePackService';
+import { speakStory, stopStorySpeech, storyCacheKey } from '../services/storySpeech';
 import type { DiscoveryRoute, OfflinePackStatus, StoryPoint } from '../types/discovery';
 import { colors, fonts, radii, spacing } from '../theme';
 
@@ -45,6 +46,7 @@ export function RoutePreviewScreen({ route, onBack, onStart }: Props) {
   const [pack, setPack] = useState<OfflinePackStatus | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
   const abortRef = useRef({ aborted: false });
   const listRef = useRef<FlatList<StoryPoint>>(null);
 
@@ -77,7 +79,50 @@ export function RoutePreviewScreen({ route, onBack, onStart }: Props) {
       track('partner_offer_previewed', { n: route.partnerOffers.length });
     }
     getOfflinePack(route.id).then(setPack);
+    return () => {
+      stopStorySpeech();
+    };
   }, [route.id, route.partnerOffers]);
+
+  const playPodcastPreview = async () => {
+    if (!selected) return;
+    if (listening) {
+      stopStorySpeech();
+      setListening(false);
+      return;
+    }
+    const text = selected.storyVersions.standard;
+    const locale = route.intent.locale || 'es-ES';
+    setListening(true);
+    track('story_preview_listened', { placeId: selected.placeId });
+    await speakStory({
+      text,
+      locale,
+      cacheKey: storyCacheKey(selected.placeId, 'standard', locale, text),
+      onDone: () => setListening(false),
+      onError: () => setListening(false),
+    });
+  };
+
+  const playIntroPreview = async () => {
+    const intro = route.podcastIntro?.trim();
+    if (!intro) return;
+    if (listening) {
+      stopStorySpeech();
+      setListening(false);
+      return;
+    }
+    const locale = route.intent.locale || 'es-ES';
+    setListening(true);
+    track('story_preview_listened', { placeId: 'intro' });
+    await speakStory({
+      text: intro,
+      locale,
+      cacheKey: storyCacheKey('route-intro', 'standard', locale, intro),
+      onDone: () => setListening(false),
+      onError: () => setListening(false),
+    });
+  };
 
   const markers = useMemo(
     () =>
@@ -247,9 +292,20 @@ export function RoutePreviewScreen({ route, onBack, onStart }: Props) {
         ) : null}
 
         <View style={styles.sectionRow}>
-          <Text style={styles.section}>Story Points</Text>
-          <Text style={styles.sectionHint}>Desliza para explorar</Text>
+          <Text style={styles.section}>Episodios ✦ (podcast)</Text>
+          <Text style={styles.sectionHint}>Escucha antes de salir · se adaptan a tu ritmo</Text>
         </View>
+
+        {route.podcastIntro ? (
+          <Pressable
+            style={({ pressed }) => [styles.listenBtn, { marginBottom: 12 }, pressed && styles.pressed]}
+            onPress={() => void playIntroPreview()}
+          >
+            <Text style={styles.listenLabel}>
+              {listening ? '■ Detener' : '▶ Escuchar intro del podcast'}
+            </Text>
+          </Pressable>
+        ) : null}
 
         <FlatList
           ref={listRef}
@@ -286,7 +342,7 @@ export function RoutePreviewScreen({ route, onBack, onStart }: Props) {
                   {sp.shortDescription}
                 </Text>
                 <Text style={styles.storyDur}>
-                  Audio ~{sp.durationSec.standard}s · estándar
+                  Podcast ~{sp.durationSec.standard}s · estándar
                   {sp.partnerOfferId ? ' · café partner' : ''}
                 </Text>
               </Pressable>
@@ -297,14 +353,22 @@ export function RoutePreviewScreen({ route, onBack, onStart }: Props) {
         {selected ? (
           <View style={styles.detail}>
             <Text style={styles.detailEyebrow}>
-              {categoryLabelEs(placeById(selected.placeId)?.category ?? 'landmark')} · ✦
+              {categoryLabelEs(placeById(selected.placeId)?.category ?? 'landmark')} · ✦ podcast
             </Text>
             <Text style={styles.detailTitle}>{placeName(selected.placeId)}</Text>
             <Text style={styles.detailBody}>{selected.storyVersions.standard}</Text>
             <Text style={styles.detailMeta}>
-              Audio ~{selected.durationSec.standard}s · quick{' '}
+              Episodio ~{selected.durationSec.standard}s · quick{' '}
               {selected.durationSec.quick}s · deep {selected.durationSec.deep}s
             </Text>
+            <Pressable
+              style={({ pressed }) => [styles.listenBtn, pressed && styles.pressed]}
+              onPress={() => void playPodcastPreview()}
+            >
+              <Text style={styles.listenLabel}>
+                {listening ? '■ Detener audio' : '▶ Escuchar episodio'}
+              </Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -638,6 +702,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,248,239,0.55)',
   },
+  listenBtn: {
+    marginTop: 14,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.terracotta,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+  },
+  listenLabel: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 14,
+    color: colors.white,
+  },
+  pressed: { opacity: 0.88 },
   packPanel: {
     backgroundColor: colors.surface,
     borderWidth: 1,

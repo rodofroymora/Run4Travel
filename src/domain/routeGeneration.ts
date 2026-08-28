@@ -105,6 +105,7 @@ export async function selectPlacesWithLlm(args: {
   maxCount: number;
   cityName: string;
   distanceKm: number;
+  startLabel?: string;
   forceFallback?: boolean;
 }): Promise<{
   placeIds: string[];
@@ -118,15 +119,24 @@ export async function selectPlacesWithLlm(args: {
   }
   const remote = await fetchLlmPlaceRank(args);
   if (remote) {
+    // Pad if ✦ returns too few stops for the distance budget.
+    let placeIds = [...remote.placeIds];
+    if (placeIds.length < args.maxCount) {
+      const filler = heuristicRankPlaceIds(args.places, args.style, args.maxCount);
+      for (const id of filler) {
+        if (!placeIds.includes(id)) placeIds.push(id);
+        if (placeIds.length >= args.maxCount) break;
+      }
+    }
     const blurbs = { ...remote.blurbs };
-    for (const id of remote.placeIds) {
+    for (const id of placeIds) {
       if (!blurbs[id]) {
         const p = args.places.find((x) => x.id === id);
         if (p) blurbs[id] = blurbForPlace(p);
       }
     }
     return {
-      placeIds: remote.placeIds,
+      placeIds,
       blurbs,
       usedFallback: false,
       routeTitle: remote.routeTitle,
@@ -152,7 +162,18 @@ export function buildRouterPolyline(
 }
 
 function estimateNarrationSec(text: string, cap: number): number {
-  return Math.max(8, Math.min(cap, Math.round(text.length / 14)));
+  // ~13 chars/sec for calm podcast Spanish
+  return Math.max(20, Math.min(cap, Math.round(text.length / 13)));
+}
+
+/** Local podcast script when ✦ API is unavailable — still spoken, not a tweet. */
+function podcastFallback(place: Place, blurb: string): StoryDraft {
+  const hook = blurb.replace(/^✦\s*/, '') || `${place.name} te espera a pie de calle.`;
+  return {
+    quick: `✦ Mientras te acercas a ${place.name}, baja un segundo el ritmo mental. ${hook} Sigue por la acera, respira, y deja que este rincón de la ciudad te hable al pasar.`,
+    standard: `✦ Bienvenido a este tramo frente a ${place.name}. Soy tu guía de Discovery Run. ${hook} Fíjate en la luz, en los detalles de la fachada o del paisaje, y en cómo la gente usa este espacio. No te detengas en la calzada: la historia viaja contigo mientras corres. Cuando pases el punto, lleva contigo una imagen clara de este lugar.`,
+    deep: `✦ Abre este episodio en ${place.name}. Aquí la ciudad baja la voz y te cuenta algo más lento. ${hook} Imagina quiénes cruzaron este mismo suelo antes que tú — vecinos, viajeros, artesanos — y qué ritmo tenía el barrio en otras décadas. Observa texturas, sombra y sonido alrededor. Si puedes, alinea una mirada segura desde la acera sin frenar el tráfico ni tu carrera. Este es el corte largo: un recuerdo sensorial para cuando termines el run y vuelvas al mapa en la cabeza.`,
+  };
 }
 
 function buildStoryPoint(
@@ -162,16 +183,15 @@ function buildStoryPoint(
   partnerOfferId?: string,
 ): StoryPoint {
   const base = blurb || blurbForPlace(place);
-  const quick = draft?.quick ?? (base.length > 90 ? `${base.slice(0, 87)}…` : base);
-  const standard = draft?.standard ?? `${base} Observa los detalles mientras pasas.`;
-  const deep =
-    draft?.deep ??
-    `${base} Aquí la ciudad cuenta su historia a quien corre con atención: arquitectura, ritmo y luz.`;
+  const fallback = podcastFallback(place, base);
+  const quick = draft?.quick ?? fallback.quick;
+  const standard = draft?.standard ?? fallback.standard;
+  const deep = draft?.deep ?? fallback.deep;
   return {
     id: `sp-${place.id}`,
     placeId: place.id,
     placeName: place.name,
-    shortDescription: draft?.quick ?? base,
+    shortDescription: quick.slice(0, 140),
     storyVersions: { quick, standard, deep },
     audio: {
       quick: `cache://audio/${place.id}/quick`,
@@ -179,9 +199,9 @@ function buildStoryPoint(
       deep: `cache://audio/${place.id}/deep`,
     },
     durationSec: {
-      quick: estimateNarrationSec(quick, 25),
-      standard: estimateNarrationSec(standard, 55),
-      deep: estimateNarrationSec(deep, 110),
+      quick: estimateNarrationSec(quick, 70),
+      standard: estimateNarrationSec(standard, 140),
+      deep: estimateNarrationSec(deep, 200),
     },
     photoSpotId: `ps-${place.id}`,
     partnerOfferId,
@@ -219,52 +239,46 @@ function routeNameFor(intent: RouteIntent, firstPlaces: Place[]): string {
   return `${lead} Discovery`;
 }
 
+function minWaypointsForDistance(distanceKm: number, forMapbox: boolean): number {
+  // Discovery density: longer runs need more story/photo stops, not just longer legs.
+  if (distanceKm <= 5) return forMapbox ? 4 : 5;
+  if (distanceKm <= 10) return forMapbox ? 7 : 8;
+  if (distanceKm <= 15) return forMapbox ? 8 : 10;
+  if (distanceKm <= 21) return forMapbox ? 10 : 11;
+  return forMapbox ? 11 : 12;
+}
+
 function waypointBudget(
   distanceKm: number,
   catalogSize: number,
   forMapbox = false,
 ): number[] {
-  const base = forMapbox
-    ? distanceKm <= 5
-      ? 3
-      : distanceKm <= 10
-        ? 5
-        : distanceKm <= 15
-          ? 7
-          : distanceKm <= 21
-            ? 9
-            : 10
-    : distanceKm <= 5
-      ? 4
-      : distanceKm <= 10
-        ? 7
-        : distanceKm <= 15
-          ? 9
-          : distanceKm <= 21
-            ? 11
-            : 12;
-
+  const minN = Math.min(catalogSize, minWaypointsForDistance(distanceKm, forMapbox));
+  const base = minN;
   const candidates = forMapbox
-    ? [base, base - 1, base + 1, base - 2, base + 2, Math.max(2, base - 3), base + 3]
-    : [base, base + 1, base - 1, base + 2, Math.max(3, base - 2)];
+    ? [base, base + 1, base + 2, Math.max(minN, base - 1), base + 3]
+    : [base, base + 1, base + 2, Math.max(minN, base - 1)];
 
-  const minN = forMapbox ? 2 : 3;
   return [...new Set(candidates.map((n) => Math.min(catalogSize, Math.max(minN, n))))];
 }
 
-/** Keep waypoints runnable: ~40% of target as max crow-fly from start. */
+/** Keep waypoints near the chosen start zone (not across the whole city). */
 export function filterPlacesNearStart(
   places: Place[],
   start: { lat: number; lng: number },
   targetDistanceM: number,
 ): Place[] {
-  const radius = Math.max(1500, targetDistanceM * 0.4);
-  const near = places.filter((p) => haversineM(start, p) <= radius);
+  const radius = Math.max(2500, targetDistanceM * 0.32);
+  const near = places
+    .map((p) => ({ p, d: haversineM(start, p) }))
+    .filter((x) => x.d <= radius)
+    .sort((a, b) => a.d - b.d)
+    .map((x) => x.p);
   if (near.length >= 4) return near;
-  // Fallback: nearest N by distance
+  // Fallback: nearest N from start — still zone-local preference
   return [...places]
     .sort((a, b) => haversineM(start, a) - haversineM(start, b))
-    .slice(0, Math.min(10, places.length));
+    .slice(0, Math.min(12, places.length));
 }
 
 export async function generateDiscoveryRoute(
@@ -279,6 +293,10 @@ export async function generateDiscoveryRoute(
 
   let best: RouteCandidate | null = null;
   let llmProvider: string | undefined;
+  const minPts = Math.min(
+    places.length,
+    minWaypointsForDistance(intent.distanceKm, forMapbox),
+  );
 
   for (const maxPoints of waypointBudget(intent.distanceKm, places.length, forMapbox)) {
     const ranked = await selectPlacesWithLlm({
@@ -287,6 +305,7 @@ export async function generateDiscoveryRoute(
       maxCount: maxPoints,
       cityName: intent.cityName,
       distanceKm: intent.distanceKm,
+      startLabel: intent.start.label,
     });
     if (ranked.provider) llmProvider = ranked.provider;
     const byId = new Map(places.map((p) => [p.id, p]));
@@ -306,7 +325,14 @@ export async function generateDiscoveryRoute(
     );
 
     const err = distanceErrorPct(directions.distanceM, intent.distanceKm);
-    if (!best || err < best.err) {
+    const denseEnough = selected.length >= minPts;
+    // Prefer denser discovery when distance is similar (don't stop at 4 stops on a 10K).
+    const score = err + (denseEnough ? 0 : 0.15) - selected.length * 0.005;
+    const bestScore = best
+      ? best.err + (best.selected.length >= minPts ? 0 : 0.15) - best.selected.length * 0.005
+      : Infinity;
+
+    if (!best || score < bestScore) {
       best = {
         selected,
         blurbs: ranked.blurbs,
@@ -318,8 +344,8 @@ export async function generateDiscoveryRoute(
         routeTitle: ranked.routeTitle,
       };
     }
-    if (err <= DISTANCE_TOLERANCE_IDEAL) break;
-    if (err <= DISTANCE_TOLERANCE) break;
+    if (err <= DISTANCE_TOLERANCE_IDEAL && denseEnough) break;
+    if (err <= DISTANCE_TOLERANCE && denseEnough) break;
   }
 
   if (!best) {
@@ -364,6 +390,8 @@ export async function generateDiscoveryRoute(
 
   const paceSecPerKm = 340; // ~5:40 /km estimado
   const estimatedMovingTimeSec = Math.round((best.distanceM / 1000) * paceSecPerKm);
+  const zone = intent.start.label ? ` desde ${intent.start.label}` : '';
+  const podcastIntro = `✦ Bienvenido a tu Discovery Run en ${intent.cityName}${zone}. Soy tu guía. Hoy recorremos unos ${intent.distanceKm} kilómetros con ${storyPoints.length} episodios. Mantén la acera, disfruta la ciudad, y cuando te acerques a cada lugar, te cuento su historia. Listos: empieza a correr.`;
 
   return {
     id: `route_${Date.now().toString(36)}`,
@@ -377,6 +405,7 @@ export async function generateDiscoveryRoute(
     photoSpots,
     places: best.selected,
     partnerOffers,
+    podcastIntro,
     provider: {
       router: best.provider,
       llm: best.usedFallback && !Object.keys(storyDrafts).length

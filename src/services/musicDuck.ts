@@ -1,4 +1,3 @@
-import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { Platform } from 'react-native';
 import { track } from './analytics';
 
@@ -8,11 +7,12 @@ let state: DuckState = 'idle';
 
 /**
  * Duck ambient music while a story plays via expo-av audio session.
- * Spotify SDK remains optional; this never blocks the run.
+ * Lazy-import expo-av so web boot does not depend on the native module.
  */
 export async function duckMusic(): Promise<boolean> {
   try {
     if (Platform.OS !== 'web') {
+      const { Audio, InterruptionModeAndroid, InterruptionModeIOS } = await import('expo-av');
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
         allowsRecordingIOS: false,
@@ -37,6 +37,7 @@ export async function resumeMusic(): Promise<void> {
   if (state !== 'ducked') return;
   try {
     if (Platform.OS !== 'web') {
+      const { Audio, InterruptionModeAndroid, InterruptionModeIOS } = await import('expo-av');
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
         allowsRecordingIOS: false,

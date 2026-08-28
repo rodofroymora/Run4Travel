@@ -95,17 +95,22 @@ export function buildMapboxGlHtml(args: {
   coordinates: [number, number][];
   markers?: MapMarker[];
   selectedMarkerId?: string | null;
+  /** Center on user marker and keep a tight zoom (active run). */
+  followUser?: boolean;
 }): string | null {
   const token = getMapboxToken();
   if (!token) return null;
   const coords = simplifyCoordinates(args.coordinates, 120);
   if (coords.length < 2) return null;
 
+  const user = (args.markers ?? []).find((m) => m.kind === 'user');
   const payload = JSON.stringify({
     token,
     coordinates: coords,
     markers: args.markers ?? [],
     selectedId: args.selectedMarkerId ?? null,
+    followUser: Boolean(args.followUser && user),
+    follow: user ? [user.lng, user.lat] : null,
   });
 
   return `<!DOCTYPE html>
@@ -164,7 +169,11 @@ export function buildMapboxGlHtml(args: {
       new mapboxgl.Marker({ element: el }).setLngLat([m.lng, m.lat]).addTo(map);
       bounds.extend([m.lng, m.lat]);
     });
-    map.fitBounds(bounds, { padding: 36, maxZoom: 15, duration: 0 });
+    if (DATA.followUser && DATA.follow) {
+      map.jumpTo({ center: DATA.follow, zoom: 15.2 });
+    } else {
+      map.fitBounds(bounds, { padding: 36, maxZoom: 15, duration: 0 });
+    }
   });
 <\/script>
 </body>

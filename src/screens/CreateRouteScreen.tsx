@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,6 +23,7 @@ import {
 } from '../domain/routeIntent';
 import { getStartSuggestions, getStartSuggestionsAsync, resolveCityQuery, searchCities, suggestDiscoveryCities } from '../services/citiesApi';
 import { track } from '../services/analytics';
+import { getCurrentCoords } from '../services/currentLocation';
 import { saveLastRouteIntent } from '../services/routeIntentStorage';
 import { colors, fonts, radii, spacing } from '../theme';
 import {
@@ -32,7 +34,16 @@ import {
   type DistanceKm,
   type RouteIntent,
   type RouteStyle,
+  type StartSuggestion,
 } from '../types/routeIntent';
+
+const START_KIND_LABEL: Record<StartSuggestion['kind'], string> = {
+  zone: 'Zona',
+  plaza: 'Plaza',
+  landmark: 'Punto',
+  hotel: 'Hotel',
+  station: 'Estación',
+};
 
 type Step = 'city' | 'start' | 'distance' | 'style';
 
@@ -68,7 +79,7 @@ export function CreateRouteScreen({
           (c) => c.name.toLowerCase() === initialCityName.toLowerCase(),
         )
       : undefined);
-  const [step, setStep] = useState<Step>(seededCity?.supported ? 'start' : 'city');
+  const [step, setStep] = useState<Step>('city');
   const [query, setQuery] = useState(seededCity?.name ?? initialCityName ?? '');
   const [draft, setDraft] = useState<RouteIntentDraft>({
     city: seededCity?.supported ? seededCity : undefined,
@@ -107,23 +118,44 @@ export function CreateRouteScreen({
     };
   }, [draft.city, suggestions]);
 
+  const zoneStarts = useMemo(
+    () => startSuggestions.filter((s) => s.kind === 'zone'),
+    [startSuggestions],
+  );
+  const otherStarts = useMemo(
+    () => startSuggestions.filter((s) => s.kind !== 'zone'),
+    [startSuggestions],
+  );
+
+  const pickStart = (s: StartSuggestion) => {
+    setDraft((d) => ({
+      ...d,
+      start: { lat: s.lat, lng: s.lng, label: s.label },
+    }));
+    track('start_selected', { startId: s.id, kind: s.kind });
+  };
+
   const stepIndex = STEPS.indexOf(step);
   const canContinue =
-    (step === 'city' && !!draft.city) ||
+    (step === 'city' && (!!draft.city || query.trim().length >= 2)) ||
     (step === 'start' && !!draft.start) ||
     (step === 'distance' && !!draft.distanceKm) ||
     (step === 'style' && !!draft.style);
 
-  const resolveTypedCity = async () => {
+  const resolveTypedCity = async (): Promise<City | null> => {
     const q = query.trim();
-    if (q.length < 2) return;
+    if (q.length < 2) return null;
+    // Already selected this city — no need to geocode again
+    if (draft.city && draft.city.name.toLowerCase() === q.toLowerCase()) {
+      return draft.city;
+    }
     setResolvingCity(true);
     setCityHint(null);
     try {
       const city = await resolveCityQuery(q);
       if (!city) {
-        setCityHint('No encontramos esa ciudad. Prueba otro nombre.');
-        return;
+        setCityHint('No encontramos esa ciudad. Prueba otro nombre o pulsa ✦ Descubrir ciudad.');
+        return null;
       }
       setDraft((d) => ({
         ...d,
@@ -135,9 +167,10 @@ export function CreateRouteScreen({
       setCityHint(
         city.id.startsWith('dyn-')
           ? `✦ Ciudad dinámica lista · ${city.country || city.name}`
-          : null,
+          : `Ciudad lista · ${city.name}`,
       );
       track('city_selected', { cityId: city.id, source: 'geocode' });
+      return city;
     } finally {
       setResolvingCity(false);
     }
@@ -158,10 +191,17 @@ export function CreateRouteScreen({
     }
   };
 
-  const goNext = () => {
-    if (step === 'city' && draft.city && !draft.city.supported) {
-      Alert.alert('Próximamente', `${draft.city.name} aún no está disponible. ¡Te avisamos!`);
-      return;
+  const goNext = async () => {
+    if (step === 'city') {
+      let city: City | null | undefined = draft.city;
+      if (!city || city.name.toLowerCase() !== query.trim().toLowerCase()) {
+        city = await resolveTypedCity();
+      }
+      if (!city) return;
+      if (!city.supported) {
+        Alert.alert('Próximamente', `${city.name} aún no está disponible. ¡Te avisamos!`);
+        return;
+      }
     }
     if (stepIndex < STEPS.length - 1) {
       setStep(STEPS[stepIndex + 1]);
@@ -198,46 +238,34 @@ export function CreateRouteScreen({
       const { status } = await Location.requestForegroundPermissionsAsync();
       track('location_permission', { status });
       if (status !== 'granted') {
-        setLocationHint('Sin ubicación: elige un punto de la lista. El flujo sigue.');
+        setLocationHint('Sin GPS: elige una zona (recomendado en web).');
         return;
       }
 
-      // Web/desktop a menudo cuelga en getCurrentPosition — timeout + lastKnown
-      const timeoutMs = 8000;
-      const pos = await Promise.race([
-        (async () => {
-          const last = await Location.getLastKnownPositionAsync();
-          if (last) return last;
-          return Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-        })(),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
-      ]);
-
-      if (!pos) {
+      const coords = await getCurrentCoords(9000);
+      if (!coords) {
         setLocationHint(
-          'GPS tardó demasiado. Elige un punto de la lista (en web es lo más fiable).',
+          'GPS no respondió a tiempo. Elige una zona — Angelópolis, Centro…',
         );
         track('location_timeout', { cityId: draft.city.id });
         return;
       }
 
       const raw = {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
+        lat: coords.lat,
+        lng: coords.lng,
         label: 'Estoy aquí',
       };
       const snapped = snapStartToCity(raw, draft.city);
       const wasOutside = snapped.lat !== raw.lat || snapped.lng !== raw.lng;
       setDraft((d) => ({ ...d, start: snapped }));
       if (wasOutside) {
-        setLocationHint('Estabas fuera de la ciudad — usamos el centro como partida.');
+        setLocationHint('Estabas fuera — usamos el centro. Mejor elige una zona.');
       } else {
         setLocationHint('Listo: partimos desde tu ubicación.');
       }
     } catch {
-      setLocationHint('No pudimos leer el GPS. Elige un punto de la lista.');
+      setLocationHint('No pudimos leer el GPS. Elige una zona de la lista.');
     } finally {
       setLocating(false);
     }
@@ -266,9 +294,13 @@ export function CreateRouteScreen({
 
         <Text style={styles.title}>{STEP_TITLE[step]}</Text>
         <Text style={styles.subtitle}>
-          {step === 'style'
-            ? 'Default: Highlights — o Cafés si quieres un coffee run con descuento al terminar.'
-            : 'Distance is a constraint. Experience is the objective.'}
+          {step === 'city'
+            ? 'Escribe Guanajuato, Puebla… y Continuar (o ✦ Descubrir ciudad).'
+            : step === 'style'
+              ? 'Default: Highlights — o Cafés si quieres un coffee run con descuento al terminar.'
+              : step === 'start'
+                ? 'Elige una zona primero (Angelópolis, Centro…). GPS es opcional.'
+                : 'Distance is a constraint. Experience is the objective.'}
         </Text>
 
         <ScrollView
@@ -374,6 +406,18 @@ export function CreateRouteScreen({
 
           {step === 'start' && draft.city && (
             <View>
+              <Pressable
+                onPress={() => {
+                  setStep('city');
+                  setLocationHint(null);
+                }}
+                style={styles.changeCityBtn}
+              >
+                <Text style={styles.changeCityLabel}>
+                  Ciudad: {draft.city.name} · Cambiar
+                </Text>
+              </Pressable>
+
               <View style={styles.mapCard}>
                 <View style={styles.mapBlob} />
                 <Text style={styles.mapCity}>{draft.city.name}</Text>
@@ -387,44 +431,70 @@ export function CreateRouteScreen({
                 ) : null}
               </View>
 
-              <Pressable
-                style={({ pressed }) => [styles.hereBtn, pressed && styles.pressed]}
-                onPress={useCurrentLocation}
-                disabled={locating}
-              >
-                {locating ? (
-                  <ActivityIndicator color={colors.white} />
-                ) : (
-                  <Text style={styles.hereLabel}>Estoy aquí</Text>
-                )}
-              </Pressable>
-              {locating ? (
-                <Text style={styles.hint}>Buscando GPS… máx. 8 s (en web mejor elige un POI)</Text>
-              ) : null}
-              {locationHint ? <Text style={styles.hint}>{locationHint}</Text> : null}
-
-              <Text style={styles.sectionLabel}>Sugerencias</Text>
-              {startSuggestions.map((s) => {
+              <Text style={styles.sectionLabel}>Zonas</Text>
+              <Text style={styles.hint}>
+                Elige de dónde sales — en web es más fiable que el GPS.
+              </Text>
+              {zoneStarts.map((s) => {
                 const selected = draft.start?.label === s.label;
                 return (
                   <Pressable
                     key={s.id}
-                    onPress={() =>
-                      setDraft((d) => ({
-                        ...d,
-                        start: { lat: s.lat, lng: s.lng, label: s.label },
-                      }))
-                    }
+                    onPress={() => pickStart(s)}
                     style={[styles.cityRow, selected && styles.cityRowOn]}
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={styles.cityName}>{s.label}</Text>
-                      <Text style={styles.cityMeta}>{s.kind}</Text>
+                      <Text style={styles.cityMeta}>{START_KIND_LABEL[s.kind]}</Text>
                     </View>
                     {selected ? <Text style={styles.check}>✓</Text> : null}
                   </Pressable>
                 );
               })}
+
+              {otherStarts.length > 0 ? (
+                <Text style={[styles.sectionLabel, { marginTop: 12 }]}>Puntos</Text>
+              ) : null}
+              {otherStarts.map((s) => {
+                const selected = draft.start?.label === s.label;
+                return (
+                  <Pressable
+                    key={s.id}
+                    onPress={() => pickStart(s)}
+                    style={[styles.cityRow, selected && styles.cityRowOn]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cityName}>{s.label}</Text>
+                      <Text style={styles.cityMeta}>{START_KIND_LABEL[s.kind]}</Text>
+                    </View>
+                    {selected ? <Text style={styles.check}>✓</Text> : null}
+                  </Pressable>
+                );
+              })}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.hereBtnGhost,
+                  pressed && styles.pressed,
+                  locating && styles.ctaDisabled,
+                ]}
+                onPress={useCurrentLocation}
+                disabled={locating}
+              >
+                {locating ? (
+                  <ActivityIndicator color={colors.ink} />
+                ) : (
+                  <Text style={styles.hereGhostLabel}>
+                    {Platform.OS === 'web'
+                      ? 'Intentar GPS (poco fiable en web)'
+                      : 'Estoy aquí (GPS)'}
+                  </Text>
+                )}
+              </Pressable>
+              {locating ? (
+                <Text style={styles.hint}>Buscando GPS… máx. 8 s</Text>
+              ) : null}
+              {locationHint ? <Text style={styles.hint}>{locationHint}</Text> : null}
             </View>
           )}
 
@@ -470,14 +540,18 @@ export function CreateRouteScreen({
           <Pressable
             style={({ pressed }) => [
               styles.cta,
-              !canContinue && styles.ctaDisabled,
-              pressed && canContinue && styles.pressed,
+              (!canContinue || resolvingCity) && styles.ctaDisabled,
+              pressed && canContinue && !resolvingCity && styles.pressed,
             ]}
-            disabled={!canContinue}
-            onPress={goNext}
+            disabled={!canContinue || resolvingCity}
+            onPress={() => void goNext()}
           >
             <Text style={styles.ctaLabel}>
-              {step === 'style' ? '✦ Crear mi ruta' : 'Continuar'}
+              {resolvingCity && step === 'city'
+                ? '✦ Buscando ciudad…'
+                : step === 'style'
+                  ? '✦ Crear mi ruta'
+                  : 'Continuar'}
             </Text>
           </Pressable>
         </View>
@@ -659,6 +733,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 999,
     marginBottom: 8,
+  },
+  hereBtnGhost: {
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: colors.borders,
+    backgroundColor: colors.surface,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 999,
+    marginBottom: 8,
+  },
+  hereGhostLabel: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.secondaryText,
+  },
+  changeCityBtn: {
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+  },
+  changeCityLabel: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 14,
+    color: colors.terracotta,
   },
   hereLabel: {
     fontFamily: fonts.bodySemi,

@@ -1,6 +1,5 @@
-import { useMemo } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { useMemo, createElement } from 'react';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { colors, fonts, radii } from '../theme';
 import { getMapboxToken } from '../services/routing';
 import {
@@ -19,7 +18,42 @@ type Props = {
   showLegend?: boolean;
   /** Prefer interactive GL when token present (default true). */
   interactive?: boolean;
+  /** Keep map centered on the user marker during an active run. */
+  followUser?: boolean;
 };
+
+function MapHtmlSurface({ html, style }: { html: string; style: object }) {
+  if (Platform.OS === 'web') {
+    // react-native-webview is native-only; iframe works in the browser.
+    return createElement('iframe', {
+      srcDoc: html,
+      style: {
+        border: 'none',
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'transparent',
+      },
+      title: 'Run4Travel map',
+      sandbox: 'allow-scripts allow-same-origin',
+    });
+  }
+
+  // Lazy require so web never mounts the stub WebView.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { WebView } = require('react-native-webview') as typeof import('react-native-webview');
+  return (
+    <WebView
+      originWhitelist={['*']}
+      source={{ html }}
+      style={style}
+      scrollEnabled={false}
+      setSupportMultipleWindows={false}
+      javaScriptEnabled
+      domStorageEnabled
+      allowsInlineMediaPlayback
+    />
+  );
+}
 
 /**
  * Mapbox map when EXPO_PUBLIC_MAPBOX_TOKEN is set; otherwise Batlló MockMap.
@@ -33,14 +67,15 @@ export function RouteMap({
   selectedMarkerId = null,
   showLegend = true,
   interactive = true,
+  followUser = false,
 }: Props) {
   const token = getMapboxToken();
   const html = useMemo(
     () =>
       interactive
-        ? buildMapboxGlHtml({ coordinates, markers, selectedMarkerId })
+        ? buildMapboxGlHtml({ coordinates, markers, selectedMarkerId, followUser })
         : null,
-    [coordinates, markers, selectedMarkerId, interactive],
+    [coordinates, markers, selectedMarkerId, interactive, followUser],
   );
   const staticUrl = useMemo(
     () => buildMapboxStaticUrl({ coordinates, markers, width: 680, height: height * 2 }),
@@ -63,16 +98,7 @@ export function RouteMap({
   if (html) {
     return (
       <View style={[styles.wrap, { height }]}>
-        <WebView
-          originWhitelist={['*']}
-          source={{ html }}
-          style={styles.webview}
-          scrollEnabled={false}
-          setSupportMultipleWindows={false}
-          javaScriptEnabled
-          domStorageEnabled
-          allowsInlineMediaPlayback
-        />
+        <MapHtmlSurface html={html} style={styles.webview} />
         {showLegend ? (
           <View style={styles.legend} pointerEvents="none">
             <View style={styles.legendItem}>

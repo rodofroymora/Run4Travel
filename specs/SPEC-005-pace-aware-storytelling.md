@@ -16,11 +16,12 @@
 - Duck → speak → resume; stop speech al pausar/finalizar.
 - Pack offline: texto ya cacheado; audio = TTS del dispositivo (sin CDN aún).
 
-### Hardening notes (v1.3)
+### Hardening notes (v1.4)
 
-- Caché AsyncStorage de scripts TTS (`warmStoryAudioCache`) al descargar offline pack.
-- `musicDuck` usa `expo-av` `DuckOthers` en native; best-effort en web.
-- `story_cache_hit` analytics en replay/warm.
+- Historias como **episodios podcast** (scripts hablados más largos vía ✦).
+- Preview: **▶ Escuchar episodio** (TTS).
+- Carrera: banner “✦ Podcast · lugar” + transcripción mientras suena.
+- TTS a ritmo de host (~0.88–0.92). Audio sigue on-device (sin CDN de voz aún).
 
 ---
 

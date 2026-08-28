@@ -346,7 +346,7 @@ export function AlbumScreen({ runId, onBack, onShare }: Props) {
             onShare();
           }}
         >
-          <Text style={styles.ctaLabel}>Compartir álbum</Text>
+          <Text style={styles.ctaLabel}>Compartir álbum · Stories / feed</Text>
         </Pressable>
       </ScrollView>
     </BatlloBackground>

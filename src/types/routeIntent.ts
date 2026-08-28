@@ -63,5 +63,5 @@ export type StartSuggestion = {
   label: string;
   lat: number;
   lng: number;
-  kind: 'landmark' | 'hotel' | 'plaza' | 'station';
+  kind: 'landmark' | 'hotel' | 'plaza' | 'station' | 'zone';
 };

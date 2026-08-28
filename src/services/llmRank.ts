@@ -81,6 +81,7 @@ export async function fetchLlmPlaceRank(args: {
   maxCount: number;
   cityName: string;
   distanceKm: number;
+  startLabel?: string;
 }): Promise<(LlmRankParsed & { provider: string }) | null> {
   const key = getLlmApiKey();
   if (!key || args.places.length < 2) return null;
@@ -94,14 +95,19 @@ export async function fetchLlmPlaceRank(args: {
     styles: p.styles,
   }));
 
+  const startHint = args.startLabel
+    ? `Start zone: "${args.startLabel}". Prefer places that make sense near that neighborhood — do not send the runner across the whole city.`
+    : 'Prefer a compact loop near the start.';
+
   const system = `You are ✦, the Run4Travel curator. Select and order running-friendly cultural places.
 Return ONLY JSON: {"placeIds":["id",...],"blurbs":{"id":"short ES blurb"},"routeTitle":"optional title"}.
-Rules: use only provided ids; never invent coordinates, streets, or geometry; max ${args.maxCount} places; prefer safe sidewalks/parks; match style "${args.style}".
+Rules: use only provided ids; never invent coordinates, streets, or geometry; select exactly ${args.maxCount} places when that many candidates exist (this is a ${args.distanceKm}km Discovery Run — more story stops beat sparse routes); ${startHint} Prefer safe sidewalks/parks; match style "${args.style}".
 If style is "cafes", prefer category cafe / styles cafes.`;
 
   const user = `City: ${args.cityName}
 DistanceKm: ${args.distanceKm}
 Style: ${args.style}
+Start: ${args.startLabel ?? 'unspecified'}
 Candidates: ${JSON.stringify(compact)}`;
 
   try {

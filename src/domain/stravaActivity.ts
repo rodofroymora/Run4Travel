@@ -6,9 +6,13 @@ export function stravaActivityName(session: RunSession): string {
 
 export function stravaActivityDescription(session: RunSession): string {
   const n = session.storyEvents.length;
-  return n > 0
-    ? `Discovery Run · ${n} ${n === 1 ? 'lugar descubierto' : 'lugares descubiertos'} con Run4Travel ✦`
-    : 'Discovery Run con Run4Travel ✦';
+  const photos = session.photos.length;
+  const stories =
+    n > 0
+      ? `${n} ${n === 1 ? 'lugar descubierto' : 'lugares descubiertos'}`
+      : 'ruta Discovery';
+  const shots = photos > 0 ? ` · ${photos} foto${photos === 1 ? '' : 's'}` : '';
+  return `Discovery Run · ${stories}${shots} con Run4Travel ✦`;
 }
 
 export function buildStravaActivityPayload(session: RunSession): {

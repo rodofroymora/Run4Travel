@@ -49,6 +49,8 @@ export type DiscoveryRoute = {
   /** Selected waypoints (catalog/POI). Used when city is dynamic. */
   places?: Place[];
   partnerOffers?: PartnerOffer[];
+  /** Spoken podcast intro played at run start. */
+  podcastIntro?: string;
   provider: { router: string; llm?: string };
   createdAt: string;
   cacheKey: string;

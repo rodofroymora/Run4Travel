@@ -16,7 +16,7 @@ export function aspectRatio(format: ShareFormat): number {
 }
 
 export function suggestedCaption(cityName: string, routeName: string): string {
-  return `✦ ${routeName} · ${cityName}\nCorre la ciudad. Escucha su historia.`;
+  return `✦ ${routeName} · ${cityName}\nDiscovery Run · Corre la ciudad. Escucha su historia. #Run4Travel`;
 }
 
 function escapeXml(s: string): string {
