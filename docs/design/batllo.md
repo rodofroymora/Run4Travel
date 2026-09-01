@@ -36,6 +36,7 @@ Cards con radios asimétricos. Botón primario: `999 / 999 / 999 / 22`.
 
 **Barcelona** — catálogo editorial (`PLACE_CATALOG_VERSION` v6). Blurbs podcast-ready; nombres de ruta por estilo (`Batlló Discovery`, `Modernisme Loop`, …).
 
+## Componentes primarios (UI kit)
 
 | Componente | Rol |
 |---|---|
@@ -47,7 +48,7 @@ Motion tokens: `src/theme/motion.ts` (`enterMs`, `pressScale`, `elevation`).
 
 ## Home (Hoy) — composición
 
-Una escena: marca → hero (mapa + saludo + un CTA) → route orb → 3 medallas → clubs.
+Una escena: marca → hero (mapa + saludo + un CTA) → route orb → 3 medallas. Clubs fuera del tab bar.
 
 ## Mock de referencia
 
