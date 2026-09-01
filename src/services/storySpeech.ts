@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Speech from 'expo-speech';
 import { Platform } from 'react-native';
 import { track } from './analytics';
-import { playPremiumTts, stopPremiumPlayback } from './premiumTts';
+import { playPremiumTts, stopPremiumPlayback, unlockSpeechAudio } from './premiumTts';
 
 export type SpeakStoryOptions = {
   text: string;
@@ -142,6 +142,8 @@ export async function speakStory(opts: SpeakStoryOptions): Promise<'spoken' | 's
     return 'skipped';
   }
 
+  unlockSpeechAudio();
+
   const locale = opts.locale ?? 'es-ES';
   const key = opts.cacheKey ?? `ad-hoc+${locale}+${hashScript(text)}`;
   const existing = await getStoryAudioCacheEntry(key);
@@ -172,3 +174,5 @@ export function stopStorySpeech(): void {
     // ignore
   }
 }
+
+export { unlockSpeechAudio };

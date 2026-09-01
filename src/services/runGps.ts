@@ -22,7 +22,8 @@ export async function createRunGpsStreamer(
       streamer: createMockGpsStreamer(opts.coords, {
         paceSecPerKm: opts.paceSecPerKm ?? 330,
         tickMs: 500,
-        metersPerTick: 22,
+        // Slower demo so story trigger windows aren't skipped in one jump
+        metersPerTick: 12,
         paceVarianceSec: 50,
       }),
       fallbackReason: 'force_demo',
@@ -36,7 +37,7 @@ export async function createRunGpsStreamer(
       streamer: createMockGpsStreamer(opts.coords, {
         paceSecPerKm: opts.paceSecPerKm ?? 330,
         tickMs: 500,
-        metersPerTick: 22,
+        metersPerTick: 12,
         paceVarianceSec: 50,
       }),
       fallbackReason: gate.reason,

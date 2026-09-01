@@ -4,8 +4,9 @@
  */
 
 export const colors = {
-  background: '#f6efe3',
-  surface: '#fff8ef',
+  /** Near-white canvas — Apple calm; warm accents stay on surfaces/CTAs. */
+  background: '#fafafa',
+  surface: '#ffffff',
   ink: '#2b1d12',
   terracotta: '#e2603c',
   seaGreen: '#2a9d8f',
@@ -13,7 +14,7 @@ export const colors = {
   mediterraneanBlue: '#3d5a80',
   amber: '#e8a63c',
   secondaryText: '#8c6f52',
-  borders: '#ead9bd',
+  borders: '#e6e0d8',
   white: '#ffffff',
 } as const;
 
@@ -23,6 +24,11 @@ export const fonts = {
   body: 'InstrumentSans_400Regular',
   bodyMedium: 'InstrumentSans_500Medium',
   bodySemi: 'InstrumentSans_600SemiBold',
+  /** Lean geometric for metrics / pace / km — Apple-adjacent. */
+  metric: 'SpaceGrotesk_500Medium',
+  metricBold: 'SpaceGrotesk_600SemiBold',
+  metricHeavy: 'SpaceGrotesk_700Bold',
+  /** Keep mono for coords / technical debug only. */
   mono: 'JetBrainsMono_500Medium',
   monoBold: 'JetBrainsMono_700Bold',
 } as const;
@@ -71,7 +77,7 @@ export const spacing = {
   xxl: 48,
 } as const;
 
-export const tabs = ['Hoy', 'Explorar', 'Clubs', 'Perfil'] as const;
+export const tabs = ['Hoy', 'Explorar', 'Perfil'] as const;
 
 export const distances = ['5K', '10K', '15K', '21K', '42K'] as const;
 

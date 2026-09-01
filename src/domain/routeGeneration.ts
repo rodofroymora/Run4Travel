@@ -223,6 +223,13 @@ function buildPhotoSpot(place: Place): PhotoSpot {
 }
 
 function routeNameFor(intent: RouteIntent, firstPlaces: Place[]): string {
+  if (intent.cityId === 'barcelona' || intent.cityName.toLowerCase().includes('barcelona')) {
+    if (intent.style === 'architecture') return 'Modernisme Loop';
+    if (intent.style === 'parks') return 'Parques & Miradores';
+    if (intent.style === 'historic') return 'Gòtic & Born Run';
+    if (intent.style === 'waterfront') return 'Mar & Passeig';
+    if (intent.style === 'highlights') return 'Batlló Discovery';
+  }
   if (intent.style === 'architecture' && intent.cityId === 'barcelona') {
     return 'Modernisme Loop';
   }
@@ -281,6 +288,23 @@ export function filterPlacesNearStart(
     .slice(0, Math.min(12, places.length));
 }
 
+/** Visit order matching the walking polyline (nearest-neighbor from start). */
+export function orderPlacesNearest(
+  start: { lat: number; lng: number },
+  places: Place[],
+): Place[] {
+  const remaining = [...places];
+  const ordered: Place[] = [];
+  let cur = start;
+  while (remaining.length) {
+    remaining.sort((a, b) => haversineM(cur, a) - haversineM(cur, b));
+    const next = remaining.shift()!;
+    ordered.push(next);
+    cur = next;
+  }
+  return ordered;
+}
+
 export async function generateDiscoveryRoute(
   intent: RouteIntent,
   router: RouteRouter = getRouteRouter(),
@@ -315,26 +339,28 @@ export async function generateDiscoveryRoute(
 
     if (selected.length < 2) continue;
 
+    const visitOrder = orderPlacesNearest(intent.start, selected);
+
     const directions = await Promise.resolve(
       router.buildDirections({
         start: intent.start,
-        waypoints: selected.map((p) => ({ lat: p.lat, lng: p.lng })),
+        waypoints: visitOrder.map((p) => ({ lat: p.lat, lng: p.lng })),
         targetDistanceM: targetM,
         preferSafe: true,
       }),
     );
 
     const err = distanceErrorPct(directions.distanceM, intent.distanceKm);
-    const denseEnough = selected.length >= minPts;
+    const denseEnough = visitOrder.length >= minPts;
     // Prefer denser discovery when distance is similar (don't stop at 4 stops on a 10K).
-    const score = err + (denseEnough ? 0 : 0.15) - selected.length * 0.005;
+    const score = err + (denseEnough ? 0 : 0.15) - visitOrder.length * 0.005;
     const bestScore = best
       ? best.err + (best.selected.length >= minPts ? 0 : 0.15) - best.selected.length * 0.005
       : Infinity;
 
     if (!best || score < bestScore) {
       best = {
-        selected,
+        selected: visitOrder,
         blurbs: ranked.blurbs,
         usedFallback: ranked.usedFallback,
         geometry: directions.coordinates,
@@ -469,23 +495,25 @@ async function refineDistanceWithPlaces(args: {
 
     if (!nextSelected || nextSelected.length < 2) break;
 
+    const visitOrder = orderPlacesNearest(intent.start, nextSelected);
+
     const directions = await Promise.resolve(
       router.buildDirections({
         start: intent.start,
-        waypoints: nextSelected.map((p) => ({ lat: p.lat, lng: p.lng })),
+        waypoints: visitOrder.map((p) => ({ lat: p.lat, lng: p.lng })),
         targetDistanceM: targetM,
         preferSafe: true,
       }),
     );
     const err = distanceErrorPct(directions.distanceM, intent.distanceKm);
     const blurbs = { ...best.blurbs };
-    for (const p of nextSelected) {
+    for (const p of visitOrder) {
       if (!blurbs[p.id]) blurbs[p.id] = blurbForPlace(p);
     }
 
     if (err < best.err || err <= DISTANCE_TOLERANCE) {
       best = {
-        selected: nextSelected,
+        selected: visitOrder,
         blurbs,
         usedFallback: best.usedFallback,
         geometry: directions.coordinates,

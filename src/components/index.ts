@@ -1,9 +1,13 @@
 export { BatlloBackground } from './BatlloBackground';
+export { BatlloButton } from './BatlloButton';
 export { CeramicScales } from './CeramicScales';
 export { Chip } from './Chip';
 export { MedalBadge } from './MedalBadge';
 export { MockMap } from './MockMap';
+export { OrganicCard } from './OrganicCard';
 export { RouteMap } from './RouteMap';
 export { PaceChart } from './PaceChart';
+export { Run4TravelLogo, Run4TravelMark } from './Run4TravelLogo';
+export { StatMedal } from './StatMedal';
 export { TabBar } from './TabBar';
 export { TrencadisMark } from './TrencadisMark';

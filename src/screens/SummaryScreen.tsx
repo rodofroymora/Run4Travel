@@ -228,7 +228,7 @@ export function SummaryScreen({
             onShare?.();
           }}
         >
-          <Text style={styles.shareLabel}>Compartir carrera</Text>
+          <Text style={styles.shareLabel}>✦ Compartir tu Discovery Run</Text>
         </Pressable>
 
         <Pressable
@@ -245,7 +245,7 @@ export function SummaryScreen({
           style={({ pressed }) => [styles.stravaBtn, pressed && styles.pressed]}
           onPress={onStrava}
         >
-          <Text style={styles.stravaLabel}>Sync to Strava</Text>
+          <Text style={styles.stravaLabel}>Strava (opcional)</Text>
         </Pressable>
       </ScrollView>
     </BatlloBackground>
@@ -321,8 +321,9 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 28,
   },
   statValue: {
-    fontFamily: fonts.monoBold,
-    fontSize: 22,
+    fontFamily: fonts.metricHeavy,
+    fontSize: 28,
+    letterSpacing: -1,
     color: colors.ink,
     marginBottom: 4,
   },
@@ -430,24 +431,30 @@ const styles = StyleSheet.create({
   },
   shareBtn: {
     backgroundColor: colors.terracotta,
-    paddingVertical: 16,
+    paddingVertical: 18,
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
     ...radii.primaryButton,
+    shadowColor: '#2b1d12',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 4,
   },
   shareLabel: {
     fontFamily: fonts.bodySemi,
-    fontSize: 16,
+    fontSize: 17,
+    letterSpacing: -0.2,
     color: colors.white,
   },
   saveBtn: {
-    backgroundColor: colors.surface,
+    backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: colors.borders,
     paddingVertical: 14,
     alignItems: 'center',
     borderRadius: 999,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   saveLabel: {
     fontFamily: fonts.bodySemi,
@@ -455,13 +462,13 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   stravaBtn: {
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
   },
   stravaLabel: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 14,
-    color: colors.mediterraneanBlue,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.secondaryText,
   },
   pressed: { opacity: 0.88 },
 });

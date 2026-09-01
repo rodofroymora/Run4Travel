@@ -8,7 +8,7 @@ type Props = {
 
 const { width, height } = Dimensions.get('window');
 
-/** Fondo crema + dots sutiles + blobs orgánicos. */
+/** Fondo casi blanco + dots sutiles + blobs orgánicos. */
 export function BatlloBackground({ children, style }: Props) {
   return (
     <View style={[styles.root, style]}>
@@ -38,7 +38,7 @@ export function BatlloBackground({ children, style }: Props) {
 const DOTS = Array.from({ length: 48 }, (_, i) => ({
   x: ((i * 17 + 5) % 96) * (width / 100),
   y: ((i * 23 + 8) % 94) * (height / 100),
-  o: 0.08 + (i % 3) * 0.03,
+  o: 0.05 + (i % 3) * 0.02,
 }));
 
 const styles = StyleSheet.create({
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     top: -60,
     right: -80,
     backgroundColor: colors.seaGreen,
-    opacity: 0.14,
+    opacity: 0.08,
     borderTopLeftRadius: 160,
     borderTopRightRadius: 120,
     borderBottomRightRadius: 180,
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     bottom: 120,
     left: -90,
     backgroundColor: colors.terracotta,
-    opacity: 0.12,
+    opacity: 0.07,
     borderTopLeftRadius: 140,
     borderTopRightRadius: 100,
     borderBottomRightRadius: 160,
@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     top: height * 0.42,
     right: -40,
     backgroundColor: colors.mosaicYellow,
-    opacity: 0.1,
+    opacity: 0.06,
     borderTopLeftRadius: 90,
     borderTopRightRadius: 70,
     borderBottomRightRadius: 100,

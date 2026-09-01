@@ -8,21 +8,39 @@ export type MapMarker = {
   index?: number;
 };
 
-/** Downsample long polylines for Static / GL overlays. */
+/** Downsample long polylines for Static / GL overlays.
+ * Always keeps endpoints and any coordinate nearest to each `preserve` point
+ * (story markers) so the drawn line still visits every stop.
+ */
 export function simplifyCoordinates(
   coords: [number, number][],
   maxPoints = 100,
+  preserve?: [number, number][],
 ): [number, number][] {
   if (coords.length <= maxPoints) return coords;
-  const step = Math.ceil(coords.length / maxPoints);
-  const out: [number, number][] = [];
-  for (let i = 0; i < coords.length; i += step) {
-    out.push(coords[i]!);
+
+  const mustKeep = new Set<number>([0, coords.length - 1]);
+  for (const p of preserve ?? []) {
+    let bestI = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < coords.length; i++) {
+      const c = coords[i]!;
+      const d = (c[0] - p[0]) ** 2 + (c[1] - p[1]) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        bestI = i;
+      }
+    }
+    mustKeep.add(bestI);
   }
-  const last = coords[coords.length - 1]!;
-  const prev = out[out.length - 1]!;
-  if (prev[0] !== last[0] || prev[1] !== last[1]) out.push(last);
-  return out;
+
+  const step = Math.ceil(coords.length / maxPoints);
+  for (let i = 0; i < coords.length; i += step) {
+    mustKeep.add(i);
+  }
+
+  const indices = [...mustKeep].sort((a, b) => a - b);
+  return indices.map((i) => coords[i]!);
 }
 
 export function routeBounds(coords: [number, number][]): {
@@ -57,7 +75,9 @@ export function buildMapboxStaticUrl(args: {
 }): string | null {
   const token = getMapboxToken();
   if (!token) return null;
-  const coords = simplifyCoordinates(args.coordinates, 80);
+  const markers = args.markers ?? [];
+  const preserve = markers.map((m) => [m.lng, m.lat] as [number, number]);
+  const coords = simplifyCoordinates(args.coordinates, 80, preserve);
   if (coords.length < 2) return null;
 
   const width = Math.min(1280, Math.max(200, Math.round(args.width ?? 640)));
@@ -100,14 +120,16 @@ export function buildMapboxGlHtml(args: {
 }): string | null {
   const token = getMapboxToken();
   if (!token) return null;
-  const coords = simplifyCoordinates(args.coordinates, 120);
+  const markers = args.markers ?? [];
+  const preserve = markers.map((m) => [m.lng, m.lat] as [number, number]);
+  const coords = simplifyCoordinates(args.coordinates, 120, preserve);
   if (coords.length < 2) return null;
 
-  const user = (args.markers ?? []).find((m) => m.kind === 'user');
+  const user = markers.find((m) => m.kind === 'user');
   const payload = JSON.stringify({
     token,
     coordinates: coords,
-    markers: args.markers ?? [],
+    markers,
     selectedId: args.selectedMarkerId ?? null,
     followUser: Boolean(args.followUser && user),
     follow: user ? [user.lng, user.lat] : null,
@@ -164,7 +186,7 @@ export function buildMapboxGlHtml(args: {
       el.style.borderRadius = m.kind === 'photo' ? '2px' : '50%';
       el.style.transform = m.kind === 'photo' ? 'rotate(45deg)' : 'none';
       el.style.background = m.kind === 'photo' ? '#f3c33f' : m.kind === 'user' ? '#2a9d8f' : '#3d5a80';
-      el.style.border = '2px solid #fff8ef';
+      el.style.border = '2px solid #ffffff';
       el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.35)';
       new mapboxgl.Marker({ element: el }).setLngLat([m.lng, m.lat]).addTo(map);
       bounds.extend([m.lng, m.lat]);

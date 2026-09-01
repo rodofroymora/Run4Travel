@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BatlloBackground } from '../components/BatlloBackground';
+import { Run4TravelMark } from '../components/Run4TravelLogo';
 import { TabBar } from '../components/TabBar';
-import { TrencadisMark } from '../components/TrencadisMark';
 import { aggregateProfileStats, type ProfileStats } from '../domain/profileStats';
 import { track } from '../services/analytics';
 import { getUserProfile, saveUserProfile } from '../services/profileStore';
@@ -84,7 +84,7 @@ export function ProfileScreen({
                 : 'Aún no hay Discovery Runs completadas'}
             </Text>
           </View>
-          <TrencadisMark size={44} />
+          <Run4TravelMark size={48} raster />
         </View>
 
         <View style={styles.statsRow}>

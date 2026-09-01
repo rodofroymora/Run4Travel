@@ -111,7 +111,7 @@ export function RouteMap({
             </View>
           </View>
         ) : null}
-        <Text style={styles.label}>{label ?? 'Mapbox · walking'}</Text>
+        {label ? <Text style={styles.label}>{label}</Text> : null}
       </View>
     );
   }
@@ -120,7 +120,7 @@ export function RouteMap({
     return (
       <View style={[styles.wrap, { height }]}>
         <Image source={{ uri: staticUrl }} style={styles.image} resizeMode="cover" />
-        <Text style={styles.label}>{label ?? 'Mapbox · static'}</Text>
+        {label ? <Text style={styles.label}>{label}</Text> : null}
       </View>
     );
   }

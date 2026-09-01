@@ -144,7 +144,13 @@ export function CreateRouteScreen({
 
   const resolveTypedCity = async (): Promise<City | null> => {
     const q = query.trim();
-    if (q.length < 2) return null;
+    if (draft.city && (!q || draft.city.name.toLowerCase() === q.toLowerCase())) {
+      return draft.city;
+    }
+    if (q.length < 2) {
+      if (draft.city) return draft.city;
+      return null;
+    }
     // Already selected this city — no need to geocode again
     if (draft.city && draft.city.name.toLowerCase() === q.toLowerCase()) {
       return draft.city;
@@ -194,17 +200,29 @@ export function CreateRouteScreen({
   const goNext = async () => {
     if (step === 'city') {
       let city: City | null | undefined = draft.city;
-      if (!city || city.name.toLowerCase() !== query.trim().toLowerCase()) {
+      const q = query.trim();
+      // Selected from list but search box empty/outdated → keep selection
+      const selectionOk =
+        city &&
+        (!q ||
+          city.name.toLowerCase() === q.toLowerCase() ||
+          city.name.toLowerCase().includes(q.toLowerCase()));
+      if (!selectionOk) {
         city = await resolveTypedCity();
+      } else if (city) {
+        setQuery(city.name);
       }
-      if (!city) return;
+      if (!city) {
+        setCityHint('Elige una ciudad de la lista o escribe su nombre.');
+        return;
+      }
       if (!city.supported) {
         Alert.alert('Próximamente', `${city.name} aún no está disponible. ¡Te avisamos!`);
         return;
       }
     }
     if (stepIndex < STEPS.length - 1) {
-      setStep(STEPS[stepIndex + 1]);
+      setStep(STEPS[stepIndex + 1]!);
       return;
     }
     confirm();
@@ -382,6 +400,8 @@ export function CreateRouteScreen({
                         start: undefined,
                         locale: city.locales[0],
                       }));
+                      setQuery(city.name);
+                      setCityHint(null);
                       track('city_selected', { cityId: city.id });
                     }}
                     style={[styles.cityRow, selected && styles.cityRowOn]}

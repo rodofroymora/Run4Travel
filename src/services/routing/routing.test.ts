@@ -28,9 +28,6 @@ const ordered = [
   { lat: 41.39, lng: 2.16 },
 ];
 const candidates = buildWaypointCandidates(ordered);
-assert.ok(candidates.length >= 3);
+assert.equal(candidates.length, 1);
 assert.equal(candidates[0]!.length, 3);
-assert.ok(candidates.some((c) => c.length === 2));
-assert.ok(candidates.some((c) => c.length === 1));
-
 console.log('routing tests: ok');

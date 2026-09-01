@@ -405,11 +405,11 @@ Debe sentirse:
 
 Background:
 
-`#f6efe3`
+`#fafafa`
 
 Surface:
 
-`#fff8ef`
+`#ffffff`
 
 Ink:
 
@@ -441,10 +441,9 @@ Secondary Text:
 
 Borders:
 
-`#ead9bd`
+`#e6e0d8`
 
-Los colores brillantes deben aparecer como acentos sobre superficies crema.
-
+Los colores brillantes deben aparecer como acentos sobre superficies blancas.
 ---
 
 # 16. Typography

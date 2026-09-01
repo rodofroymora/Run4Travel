@@ -83,6 +83,38 @@ export function stopPremiumPlayback(): void {
   active = null;
 }
 
+/** Unlock web audio / speech so mid-run podcasts aren't blocked after the first gesture. */
+export function unlockSpeechAudio(): void {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+  try {
+    const AudioCtx =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      void ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.01);
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    if (window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      window.speechSynthesis.speak(u);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Play premium TTS (OpenAI) when available.
  * Web: HTMLAudioElement. Native: expo-av + cache file.

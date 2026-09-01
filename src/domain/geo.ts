@@ -74,3 +74,39 @@ export function formatDuration(sec: number): string {
 export function formatDistanceKm(meters: number): string {
   return `${(meters / 1000).toFixed(2)} km`;
 }
+
+/** Minimum distance from a point to any vertex/segment of a polyline (meters). */
+export function distanceToPolylineM(
+  point: { lat: number; lng: number },
+  coords: [number, number][],
+): number {
+  if (!coords.length) return Infinity;
+  let best = Infinity;
+  for (let i = 0; i < coords.length; i++) {
+    const [lng, lat] = coords[i]!;
+    best = Math.min(best, haversineM(point, { lat, lng }));
+  }
+  return best;
+}
+
+/**
+ * Distance along the polyline to the vertex closest to `point`.
+ * Used so demo GPS (which follows the line) still triggers off-road POIs.
+ */
+export function distanceAlongToClosestM(
+  point: { lat: number; lng: number },
+  coords: [number, number][],
+): number {
+  if (!coords.length) return 0;
+  let bestI = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < coords.length; i++) {
+    const [lng, lat] = coords[i]!;
+    const d = haversineM(point, { lat, lng });
+    if (d < bestD) {
+      bestD = d;
+      bestI = i;
+    }
+  }
+  return lineDistanceM(coords.slice(0, bestI + 1));
+}

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   selectStoryVersion,
+  shouldTriggerAlongRoute,
   shouldTriggerStory,
   startBeforeArrivalM,
 } from './storyVersion';
@@ -29,8 +30,12 @@ const standard = selectStoryVersion({
 assert.ok(['standard', 'quick', 'deep'].includes(standard.version));
 
 const lead = startBeforeArrivalM(42, 340);
-assert.ok(lead > 0);
+assert.ok(lead >= 120);
+assert.ok(lead <= 260);
 assert.ok(shouldTriggerStory(lead - 5, lead));
 assert.equal(shouldTriggerStory(lead + 80, lead), false);
+
+assert.ok(shouldTriggerAlongRoute(500, 520, 140));
+assert.equal(shouldTriggerAlongRoute(500, 800, 140), false);
 
 console.log('storyVersion tests: ok');

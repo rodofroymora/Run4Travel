@@ -5,7 +5,7 @@ import { BatlloBackground } from '../components/BatlloBackground';
 import { RouteMap } from '../components/RouteMap';
 import { PaceChart } from '../components/PaceChart';
 import { getPlacesForCity } from '../data/places';
-import { formatDistanceKm, formatDuration, formatPace, haversineM } from '../domain/geo';
+import { formatDistanceKm, formatDuration, formatPace, haversineM, distanceAlongToClosestM } from '../domain/geo';
 import { evaluatePhotoSafety } from '../domain/photoSafety';
 import { unlockOffers } from '../domain/partnerOffers';
 import {
@@ -18,6 +18,7 @@ import {
 } from '../domain/runMetrics';
 import {
   selectStoryVersion,
+  shouldTriggerAlongRoute,
   shouldTriggerStory,
   startBeforeArrivalM,
 } from '../domain/storyVersion';
@@ -26,7 +27,7 @@ import { duckMusic, resumeMusic } from '../services/musicDuck';
 import { createRunGpsStreamer } from '../services/runGps';
 import type { GpsStreamer, GpsSource } from '../services/gpsTypes';
 import { captureRunPhoto } from '../services/runCamera';
-import { speakStory, stopStorySpeech, storyCacheKey } from '../services/storySpeech';
+import { speakStory, stopStorySpeech, storyCacheKey, unlockSpeechAudio } from '../services/storySpeech';
 import { saveRunSession } from '../services/runSessionStore';
 import type { DiscoveryRoute, StoryVersionKey } from '../types/discovery';
 import type { GpsSample, RunPhoto, RunSession } from '../types/run';
@@ -82,6 +83,17 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
   const promptedPhotos = useRef(new Set<string>());
   const playedStories = useRef(new Set<string>());
   const lastVersion = useRef<StoryVersionKey | null>(null);
+  const speakingRef = useRef(false);
+  const storyQueue = useRef<
+    {
+      spId: string;
+      placeName: string;
+      version: StoryVersionKey;
+      text: string;
+      cacheKey: string;
+      placeId: string;
+    }[]
+  >([]);
   const streamerRef = useRef<GpsStreamer | null>(null);
   const [gpsSource, setGpsSource] = useState<GpsSource>('demo');
   const [gpsHint, setGpsHint] = useState<string | null>(null);
@@ -150,6 +162,7 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
   useEffect(() => {
     let cancelled = false;
     track('run_started', { routeId: route.id });
+    unlockSpeechAudio();
     setSamples([]);
     setTick(0);
 
@@ -209,29 +222,75 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
     void duckMusic();
     setBanner({ kind: 'intro', text: '✦ Intro · Discovery Run' });
     track('story_played', { storyPointId: 'intro', version: 'standard', format: 'podcast_intro' });
+    speakingRef.current = true;
     void speakStory({
       text: intro,
       locale,
       cacheKey,
       onDone: () => {
+        speakingRef.current = false;
         void resumeMusic();
         setBanner((b) => (b?.kind === 'intro' ? null : b));
+        void drainStoryQueue();
       },
     });
   }, [route]);
 
+  const drainStoryQueue = useCallback(async () => {
+    if (speakingRef.current) return;
+    const next = storyQueue.current.shift();
+    if (!next) return;
+    speakingRef.current = true;
+    const locale = route.intent.locale || 'es-ES';
+    lastSpoken.current = {
+      text: next.text,
+      cacheKey: next.cacheKey,
+      kind: 'story',
+      version: next.version,
+      storyPointId: next.spId,
+    };
+    setHasReplay(true);
+    void duckMusic();
+    setBanner({
+      kind: 'story',
+      text: `✦ Podcast · ${next.placeName}`,
+      version: next.version,
+      storyPointId: next.spId,
+    });
+    track('story_played', {
+      storyPointId: next.spId,
+      version: next.version,
+      format: 'podcast',
+    });
+    await speakStory({
+      text: next.text,
+      locale,
+      cacheKey: next.cacheKey,
+      onDone: () => {
+        speakingRef.current = false;
+        void resumeMusic();
+        setBanner((b) => (b?.kind === 'story' ? null : b));
+        void drainStoryQueue();
+      },
+    });
+  }, [route.intent.locale]);
+
   const skipAudio = useCallback(() => {
     stopStorySpeech();
+    speakingRef.current = false;
     void resumeMusic();
     setBanner(null);
     track('story_tts_skipped', { reason: 'user_skip' });
-  }, []);
+    void drainStoryQueue();
+  }, [drainStoryQueue]);
 
   const replayAudio = useCallback(() => {
     const last = lastSpoken.current;
     if (!last) return;
     stopStorySpeech();
+    storyQueue.current = [];
     const locale = route.intent.locale || 'es-ES';
+    speakingRef.current = true;
     void duckMusic();
     if (last.kind === 'intro') {
       setBanner({ kind: 'intro', text: '✦ Intro · Discovery Run' });
@@ -253,6 +312,7 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
       locale,
       cacheKey: last.cacheKey,
       onDone: () => {
+        speakingRef.current = false;
         void resumeMusic();
         setBanner(null);
       },
@@ -272,67 +332,87 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
     [tick, samples],
   );
 
-  // Story + photo triggers
+  // Story + photo triggers — radius OR along-route (demo-friendly)
   useEffect(() => {
     if (paused || !userPos) return;
+    const coords = route.geometry.coordinates;
+    const alongM = sessionRef.current.distanceM;
 
-    const idx = sessionRef.current.nextStoryIndex;
-    const sp = route.storyPoints[idx];
-    if (sp && !playedStories.current.has(sp.id)) {
-      const place = places.find((p) => p.id === sp.placeId);
-      if (place) {
-        const dist = haversineM(userPos, place);
-        const { version, reason } = selectStoryVersion({
-          distanceToPointM: dist,
-          paceSecPerKm: pace,
-          durations: sp.durationSec,
-        });
-        const lead = startBeforeArrivalM(sp.durationSec[version], pace);
-        if (shouldTriggerStory(dist, lead)) {
-          track('story_triggered', { storyPointId: sp.id });
-          track('story_version_selected', { version, reason });
-          if (lastVersion.current && lastVersion.current !== version) {
-            sessionRef.current.narrationAdaptations += 1;
+    for (let i = 0; i < route.storyPoints.length; i++) {
+      const sp = route.storyPoints[i]!;
+      if (playedStories.current.has(sp.id)) continue;
+
+      const fromCatalog = places.find((p) => p.id === sp.placeId);
+      const photo = route.photoSpots.find(
+        (ps) => ps.placeId === sp.placeId || ps.id === sp.photoSpotId,
+      );
+      const place = fromCatalog
+        ? {
+            id: fromCatalog.id,
+            name: fromCatalog.name,
+            lat: fromCatalog.lat,
+            lng: fromCatalog.lng,
           }
-          lastVersion.current = version;
-          playedStories.current.add(sp.id);
-          void duckMusic();
-          setBanner({
-            kind: 'story',
-            text: `✦ Podcast · ${place.name}`,
-            version,
-            storyPointId: sp.id,
-          });
-          sessionRef.current.storyEvents.push({
-            storyPointId: sp.id,
-            version,
-            at: new Date().toISOString(),
-          });
-          sessionRef.current.nextStoryIndex = idx + 1;
-          void persist();
-          track('story_played', { storyPointId: sp.id, version, format: 'podcast' });
-          const spoken = sp.storyVersions[version];
-          const locale = route.intent.locale || 'es-ES';
-          const cacheKey = storyCacheKey(sp.placeId, version, locale, spoken);
-          lastSpoken.current = {
-            text: spoken,
-            cacheKey,
-            kind: 'story',
-            version,
-            storyPointId: sp.id,
-          };
-          setHasReplay(true);
-          void speakStory({
-            text: spoken,
-            locale,
-            cacheKey,
-            onDone: () => {
-              void resumeMusic();
-              setBanner((b) => (b?.kind === 'story' ? null : b));
-            },
-          });
-        }
+        : photo
+          ? {
+              id: sp.placeId,
+              name: sp.placeName ?? 'lugar',
+              lat: photo.lat,
+              lng: photo.lng,
+            }
+          : null;
+      if (!place) {
+        track('story_tts_skipped', { reason: 'place_missing', storyPointId: sp.id });
+        playedStories.current.add(sp.id);
+        continue;
       }
+
+      const dist = haversineM(userPos, place);
+      const { version, reason } = selectStoryVersion({
+        distanceToPointM: dist,
+        paceSecPerKm: pace,
+        durations: sp.durationSec,
+      });
+      const lead = startBeforeArrivalM(sp.durationSec[version], pace);
+      const placeAlong = distanceAlongToClosestM(place, coords);
+      const near = shouldTriggerStory(dist, lead);
+      const nearAlong = shouldTriggerAlongRoute(alongM, placeAlong, 160);
+
+      if (!near && !nearAlong) continue;
+
+      track('story_triggered', {
+        storyPointId: sp.id,
+        distM: Math.round(dist),
+        along: nearAlong ? 1 : 0,
+        crow: near ? 1 : 0,
+      });
+      track('story_version_selected', { version, reason });
+      if (lastVersion.current && lastVersion.current !== version) {
+        sessionRef.current.narrationAdaptations += 1;
+      }
+      lastVersion.current = version;
+      playedStories.current.add(sp.id);
+      sessionRef.current.storyEvents.push({
+        storyPointId: sp.id,
+        version,
+        at: new Date().toISOString(),
+      });
+      sessionRef.current.nextStoryIndex = Math.max(sessionRef.current.nextStoryIndex, i + 1);
+      void persist();
+
+      const spoken = sp.storyVersions[version];
+      const locale = route.intent.locale || 'es-ES';
+      const cacheKey = storyCacheKey(sp.placeId, version, locale, spoken);
+      storyQueue.current.push({
+        spId: sp.id,
+        placeName: place.name,
+        version,
+        text: spoken,
+        cacheKey,
+        placeId: sp.placeId,
+      });
+      void drainStoryQueue();
+      break;
     }
 
     for (const ps of route.photoSpots) {
@@ -359,7 +439,7 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
         track('photo_spot_deferred_safety', { reason: decision.reason });
       }
     }
-  }, [tick, paused, userPos, route, places, pace, persist]);
+  }, [tick, paused, userPos, route, places, pace, persist, drainStoryQueue]);
 
   const markers = useMemo(() => {
     const list: { id: string; lat: number; lng: number; kind: 'story' | 'photo' | 'user' }[] = [];
@@ -572,7 +652,12 @@ export function ActiveRunScreen({ route, onFinished, onDiscard }: Props) {
                       </Text>
                     </>
                   ) : (
-                    <Text style={styles.bannerMeta}>Intro del podcast · puedes saltar o repetir</Text>
+                    <>
+                      <Text style={styles.bannerMeta}>Intro del podcast · puedes saltar o repetir</Text>
+                      <Text style={styles.bannerTranscript} numberOfLines={3}>
+                        {route.podcastIntro?.trim() ?? ''}
+                      </Text>
+                    </>
                   )}
                   <View style={styles.bannerActions}>
                     <Pressable style={styles.bannerBtnGhost} onPress={skipAudio}>
@@ -683,8 +768,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   secondaryMetric: {
-    fontFamily: fonts.mono,
-    fontSize: 11,
+    fontFamily: fonts.metric,
+    fontSize: 12,
+    letterSpacing: -0.2,
     color: colors.secondaryText,
   },
   metric: {
@@ -692,19 +778,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.borders,
-    padding: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    minHeight: 72,
+    justifyContent: 'space-between',
     ...radii.cardStat,
   },
   metricValue: {
-    fontFamily: fonts.monoBold,
-    fontSize: 16,
+    fontFamily: fonts.metricHeavy,
+    fontSize: 22,
+    letterSpacing: -0.8,
     color: colors.ink,
   },
   metricLabel: {
     fontFamily: fonts.body,
     fontSize: 11,
     color: colors.secondaryText,
-    marginTop: 2,
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   banner: {
     backgroundColor: colors.ink,

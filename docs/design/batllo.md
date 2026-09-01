@@ -6,8 +6,8 @@ Referencia operativa. Detalle completo en [`CONSTITUTION.md`](../../CONSTITUTION
 
 | Token | Hex | Uso |
 |-------|-----|-----|
-| background | `#f6efe3` | Fondo app |
-| surface | `#fff8ef` | Cards / superficies |
+| background | `#fafafa` | Fondo app (casi blanco) |
+| surface | `#ffffff` | Cards / superficies |
 | ink | `#2b1d12` | Texto principal |
 | terracotta | `#e2603c` | CTA primario |
 | seaGreen | `#2a9d8f` | Acentos / stats |
@@ -15,19 +15,39 @@ Referencia operativa. Detalle completo en [`CONSTITUTION.md`](../../CONSTITUTION
 | mediterraneanBlue | `#3d5a80` | Acentos |
 | amber | `#e8a63c` | Trencadís |
 | secondaryText | `#8c6f52` | Texto secundario |
-| borders | `#ead9bd` | Bordes sutiles |
+| borders | `#e6e0d8` | Bordes sutiles |
 
-Los colores brillantes son **acentos** sobre crema — nunca el fondo dominante.
+Los colores brillantes son **acentos** sobre blanco — nunca el fondo dominante.
 
 ## Tipografía
 
-- **Gabarito** 700–800, tracking `-0.02em` — headings
+- **Gabarito** 700–800 — headings con carácter (Gaudí energy)
 - **Instrument Sans** — body / UI
-- **JetBrains Mono** — pace, km, coords
+- **Space Grotesk** — métricas, ritmo, km (lean / Apple-adjacent)
+- **JetBrains Mono** — solo coords / debug técnico
+
+Alternativas lean si evoluciona el sistema: **Outfit** / **Sora** (display), **Manrope** / **DM Sans** (body). Evitar Inter genérico.
 
 ## Geometría
 
 Cards con radios asimétricos. Botón primario: `999 / 999 / 999 / 22`.
+
+## Ciudad hero
+
+**Barcelona** — catálogo editorial (`PLACE_CATALOG_VERSION` v6). Blurbs podcast-ready; nombres de ruta por estilo (`Batlló Discovery`, `Modernisme Loop`, …).
+
+
+| Componente | Rol |
+|---|---|
+| `BatlloButton` | CTA: `primary` · `secondary` · `ghost` · `ink` — press scale Apple |
+| `OrganicCard` | Superficie orgánica: `surface` · `terracotta` · `ink` + elevation |
+| `StatMedal` | Stats con gradiente cerámico (no chips planos) |
+
+Motion tokens: `src/theme/motion.ts` (`enterMs`, `pressScale`, `elevation`).
+
+## Home (Hoy) — composición
+
+Una escena: marca → hero (mapa + saludo + un CTA) → route orb → 3 medallas → clubs.
 
 ## Mock de referencia
 

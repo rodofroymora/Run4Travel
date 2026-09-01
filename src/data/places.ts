@@ -2,7 +2,10 @@ import type { Place } from '../types/discovery';
 import { cafePlacesForCity } from './cafes';
 
 /** Bump when catalog coords/IDs change — invalidates route cache keys. */
-export const PLACE_CATALOG_VERSION = 'v5';
+export const PLACE_CATALOG_VERSION = 'v6';
+
+/** Ciudad hero editorial — estándar de calidad para Discovery Runs. */
+export const HERO_CITY_ID = 'barcelona';
 
 /** Catálogo curado — coords reales; ✦ solo elige IDs de aquí. */
 export const PLACES_BY_CITY: Record<string, Place[]> = {
@@ -520,24 +523,42 @@ export const PLACES_BY_CITY: Record<string, Place[]> = {
 
 /** Editorial blurbs keyed by place id — ✦ may rewrite tone, never coords. */
 export const PLACE_BLURBS: Record<string, string> = {
-  'bcn-batllo': 'La fachada de Gaudí respira como un dragón urbano; corre por el Passeig y mírala de reojo.',
-  'bcn-pedrera': 'Ondas de piedra que desafían la línea recta: La Pedrera te pide una mirada lenta.',
-  'bcn-sagrada': 'Torres que aún crecen: la Sagrada marca el ritmo de la ciudad moderna.',
-  'bcn-park-guell': 'Bancos de trencadís y vistas al mar: Park Güell es pausa y color.',
-  'bcn-ciutadella': 'Cascada, sombra y aire libre: Ciutadella es el pulmón del Eixample Este.',
-  'bcn-barceloneta': 'Sal y brisa en el asfalto: Barceloneta cambia el ritmo de tus zancadas.',
-  'bcn-born': 'Calles estrechas, historia densa: El Born premia quien corre con calma.',
-  'bcn-gotic': 'El Gòtic guarda siglos en cada recodo; sigue las aceras anchas.',
-  'bcn-montjuic': 'Mirador y pendiente suave: Montjuïc regala cielo abierto.',
-  'bcn-arc': 'El Arc de Triomf abre el paseo hacia el parque; foto rápida sin frenar.',
-  'bcn-sant-pau': 'Modernisme hospitalario: Sant Pau sorprende lejos del ruido turístico.',
-  'bcn-gracia': 'Plaça del Sol: barrio a escala humana, ideal para hidden gems.',
-  'bcn-palau-musica': 'El Palau brilla con cerámica y música; pasa por la acera del auditorio.',
-  'bcn-forum': 'Horizonte marítimo y espacio amplio: el Fòrum estira la zancada.',
-  'bcn-tibidabo': 'La ciudad a tus pies: Tibidabo es recompensa panorámica.',
-  'bcn-santa-maria': 'Gótico catalán junto al Born: Santa Maria del Mar invita a mirar arriba.',
-  'bcn-port-vell': 'Mástiles y paseo marítimo: Port Vell conecta centro y mar.',
-  'bcn-poble-sec': 'Barrio al pie de Montjuïc: Poble Sec es ritmo local.',
+  'bcn-batllo':
+    'En el Passeig de Gràcia, la fachada de Casa Batlló parece respirar: escamas, huesos y un tejado de dragón. Corre por la acera ancha y mira de reojo — Gaudí no pide que te detengas, pide que veas distinto.',
+  'bcn-pedrera':
+    'La Pedrera ondula como una ola de piedra. Las chimeneas del terrado parecen guerreros. Desde la calle, el modernisme deja de ser museo y se vuelve ritmo bajo tus pies.',
+  'bcn-sagrada':
+    'La Sagrada Família aún crece: torres que pinchan el cielo y un silencio raro en medio del Eixample. Al pasar, nota cómo la ciudad moderna gira alrededor de esta obra incompleta a propósito.',
+  'bcn-park-guell':
+    'Park Güell: trencadís, bancos de serpiente y una vista que abre el pecho. Si subes con calma, el premio no es la foto — es el aire de collina sobre el mar.',
+  'bcn-ciutadella':
+    'Ciutadella es el pulmón verde del este: cascada, sombra y paseo ancho. Ideal para recuperar zancada sin perder la ciudad de vista.',
+  'bcn-barceloneta':
+    'Barceloneta cambia el tempo: sal, mástiles y asfalto junto al agua. Baja el ritmo mental; aquí el Mediterráneo corre contigo.',
+  'bcn-born':
+    'El Born estrecha las calles y densifica la historia. Corre con calma: cada recodo guarda un siglo y una terraza.',
+  'bcn-gotic':
+    'El Gòtic no se corre a prisa. Aceras irregulares, campanas y piedra que ha visto imperios. Elige la calle ancha y deja que la ciudad hable bajo.',
+  'bcn-montjuic':
+    'Montjuïc eleva la mirada: pendiente suave, miradores y cielo abierto. El premio es el horizonte, no el reloj.',
+  'bcn-arc':
+    'El Arc de Triomf abre el paseo hacia Ciutadella. Una foto al paso, sin frenar el flujo — Barcelona celebra en movimiento.',
+  'bcn-sant-pau':
+    'Sant Pau es modernisme lejos del ruido: pabellones, cerámica y jardines. Un respiro hospitalario que hoy es patrimonio.',
+  'bcn-gracia':
+    'Gràcia a escala humana: Plaça del Sol, vecinos y ritmo de barrio. Aquí el Discovery Run se siente local, no turístico.',
+  'bcn-palau-musica':
+    'El Palau de la Música brilla en cerámica y cristal. Pasa por la acera del auditorio: la ciudad también se escucha.',
+  'bcn-forum':
+    'El Fòrum estira la zancada hacia el horizonte marítimo. Espacio amplio, poco teatro — solo ciudad y viento.',
+  'bcn-tibidabo':
+    'Tibidabo pone la ciudad a tus pies. Si llegas aquí, el episodio es panorámico: luces, mar y la curva de Collserola.',
+  'bcn-santa-maria':
+    'Santa Maria del Mar: gótico catalán junto al Born. Mira arriba un segundo — la nave es un suspiro de piedra.',
+  'bcn-port-vell':
+    'Port Vell conecta centro y mar: mástiles, paseo y luz baja. Buen tramo para alargar la zancada sin perder el hilo de la historia.',
+  'bcn-poble-sec':
+    'Poble Sec, al pie de Montjuïc: ritmo de barrio, bares y pendiente. La Barcelona que corre sin disfraz.',
   'cdmx-zocalo': 'El corazón del país: el Zócalo impone escala y memoria.',
   'cdmx-bellas': 'Mármol y cúpula: Bellas Artes es arquitectura para detener el aliento.',
   'cdmx-reforma': 'El Ángel vigila Reforma; corre por la acera amplia y segura.',

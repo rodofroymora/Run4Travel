@@ -15,6 +15,11 @@ import {
   JetBrainsMono_500Medium,
   JetBrainsMono_700Bold,
 } from '@expo-google-fonts/jetbrains-mono';
+import {
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from '@expo-google-fonts/space-grotesk';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActiveRunScreen } from './src/screens/ActiveRunScreen';
 import { AlbumScreen } from './src/screens/AlbumScreen';
@@ -55,6 +60,9 @@ export default function App() {
     InstrumentSans_400Regular,
     InstrumentSans_500Medium,
     InstrumentSans_600SemiBold,
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_600SemiBold,
+    SpaceGrotesk_700Bold,
     JetBrainsMono_500Medium,
     JetBrainsMono_700Bold,
   });
@@ -91,8 +99,7 @@ export default function App() {
 
   const onTabChange = useCallback((next: TabId) => {
     setTab(next);
-    if (next === 'Clubs') setScreen('clubs');
-    else if (next === 'Hoy') setScreen('home');
+    if (next === 'Hoy') setScreen('home');
     else if (next === 'Explorar') setScreen('explore');
     else if (next === 'Perfil') setScreen('profile');
   }, []);

@@ -29,7 +29,7 @@ type Props = {
 export function ClubsScreen({
   cityId = 'barcelona',
   cityName = 'Barcelona',
-  activeTab = 'Clubs',
+  activeTab = 'Perfil',
   onTabChange,
 }: Props) {
   const insets = useSafeAreaInsets();

@@ -32,22 +32,34 @@ export function selectStoryVersion(input: VersionSelectInput): {
 
 /**
  * Distancia antes del punto para empezar el audio y alinear el climax.
- * Negativo = metros antes de llegar.
+ * Capado: podcasts largos no exigen 400 m de lead (el demo GPS se los salta).
  */
 export function startBeforeArrivalM(
   versionDurationSec: number,
   paceSecPerKm: number,
-  climaxRatio = 0.65,
+  climaxRatio = 0.55,
 ): number {
   const pace = paceSecPerKm > 0 ? paceSecPerKm : 360;
   const speedMps = 1000 / pace;
   const leadSec = versionDurationSec * climaxRatio;
-  return Math.round(leadSec * speedMps);
+  const raw = Math.round(leadSec * speedMps);
+  // Reliable window for demo + sidewalk snap: never thinner than 120 m, never > 260 m
+  return Math.max(120, Math.min(260, raw || 120));
 }
 
 export function shouldTriggerStory(
   distanceToPointM: number,
   startAtDistanceM: number,
 ): boolean {
-  return distanceToPointM <= startAtDistanceM && distanceToPointM >= -40;
+  const radius = Math.max(120, Math.min(startAtDistanceM, 280));
+  return distanceToPointM <= radius;
+}
+
+/** Along-route trigger: runner is near the polyline vertex closest to the place. */
+export function shouldTriggerAlongRoute(
+  distanceAlongM: number,
+  placeAlongM: number,
+  windowM = 140,
+): boolean {
+  return Math.abs(distanceAlongM - placeAlongM) <= windowM;
 }
